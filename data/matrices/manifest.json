@@ -1,0 +1,77 @@
+{
+  "seed": 1234,
+  "matrices": [
+    {
+      "class_name": "banded",
+      "rows": 200000,
+      "cols": 200000,
+      "nnz": 1399988,
+      "nnz_per_row_mean": 6.99994,
+      "nnz_per_row_median": 7.0,
+      "nnz_per_row_max": 7.0,
+      "nnz_per_row_stddev": 0.011832007437455407,
+      "imbalance_ratio": 1.0000085715020415,
+      "file": "banded.npz"
+    },
+    {
+      "class_name": "uniform_random",
+      "rows": 100000,
+      "cols": 100000,
+      "nnz": 1599890,
+      "nnz_per_row_mean": 15.9989,
+      "nnz_per_row_median": 16.0,
+      "nnz_per_row_max": 16.0,
+      "nnz_per_row_stddev": 0.03314800144805113,
+      "imbalance_ratio": 1.0000687547268874,
+      "file": "uniform_random.npz"
+    },
+    {
+      "class_name": "power_law",
+      "rows": 100000,
+      "cols": 100000,
+      "nnz": 804454,
+      "nnz_per_row_mean": 8.04454,
+      "nnz_per_row_median": 2.0,
+      "nnz_per_row_max": 1990.0,
+      "nnz_per_row_stddev": 59.71711928909833,
+      "imbalance_ratio": 247.37275220211473,
+      "file": "power_law.npz"
+    },
+    {
+      "class_name": "diagonal_heavy",
+      "rows": 200000,
+      "cols": 200000,
+      "nnz": 599998,
+      "nnz_per_row_mean": 2.99999,
+      "nnz_per_row_median": 3.0,
+      "nnz_per_row_max": 3.0,
+      "nnz_per_row_stddev": 0.003162261848740551,
+      "imbalance_ratio": 1.0000033333444445,
+      "file": "diagonal_heavy.npz"
+    },
+    {
+      "class_name": "dense_rows",
+      "rows": 20000,
+      "cols": 20000,
+      "nnz": 460083,
+      "nnz_per_row_mean": 23.00415,
+      "nnz_per_row_median": 4.0,
+      "nnz_per_row_max": 1923.0,
+      "nnz_per_row_stddev": 189.0941713347545,
+      "imbalance_ratio": 83.59361245688278,
+      "file": "dense_rows.npz"
+    },
+    {
+      "class_name": "blocked",
+      "rows": 100000,
+      "cols": 100000,
+      "nnz": 1600000,
+      "nnz_per_row_mean": 16.0,
+      "nnz_per_row_median": 16.0,
+      "nnz_per_row_max": 16.0,
+      "nnz_per_row_stddev": 0.0,
+      "imbalance_ratio": 1.0,
+      "file": "blocked.npz"
+    }
+  ]
+}

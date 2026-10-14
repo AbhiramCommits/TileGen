@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+build/lib/
+dist/
+
+# Generated / build artifacts
+build/
+!build/.gitkeep
+*.o
+*.so
+*.dylib
+*.dll
+*.a
+*.out
+CMakeCache.txt
+CMakeFiles/
+
+# Generated matrices are large; only the manifest is tracked.
+data/matrices/*.npz
+data/matrices/*.bin
+
+# Editor / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/

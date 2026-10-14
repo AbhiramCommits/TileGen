@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tilegen"
+version = "0.1.0"
+description = "TileGen: a mini DSL and code generator for sparse linear algebra kernels (CUDA + OpenMP CPU fallback)."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "TileGen Contributors" }]
+dependencies = [
+    "numpy>=1.21",
+    "scipy>=1.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+tilegen-matrices = "tilegen.matrices:main"
+
+[tool.setuptools.packages.find]
+include = ["tilegen*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
