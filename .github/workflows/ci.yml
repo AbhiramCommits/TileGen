@@ -1,0 +1,74 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    name: build, test, verify, tune (CPU backend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Configure C++/CUDA project
+        run: cmake -S cpp -B build/cpp -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build C++ targets
+        run: cmake --build build/cpp -j
+
+      - name: Run Catch2 reference tests
+        run: ./build/cpp/tilegen_tests
+
+      - name: Run pytest
+        run: python -m pytest -q
+
+      - name: Full pipeline (GPU-free; numerics on CPU)
+        run: make all BUDGET=6
+
+      - name: Upload results artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tilegen-results
+          path: results/
+
+  cuda-codegen:
+    name: CUDA code generation text checks (GPU-free)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Generate CUDA sources
+        run: python scripts/gen_demo.py
+
+      - name: Check emitted CUDA markers
+        run: |
+          set -e
+          echo "checking for __global__ kernels"
+          grep -Rl "__global__" build/generated/*.cu
+          echo "checking for #pragma unroll"
+          grep -Rl "#pragma unroll" build/generated/*.cu
+          echo "checking for warp segmented reduction marker"
+          grep -Rl "__shfl_down_sync" build/generated/*.cu
+          echo "all CUDA codegen markers present"
