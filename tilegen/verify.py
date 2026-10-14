@@ -274,6 +274,41 @@ def _max_row_nnz(A: sp.csr_matrix) -> int:
     return int(counts.max()) if counts.size else 0
 
 
+def run_kernel(lib_path: str, kernel_name: str, A: sp.csr_matrix, data, K: int = 8):
+    """Load ``lib_path`` and invoke ``launch_<kernel_name>`` via ctypes."""
+    M, N = A.shape
+    nnz = int(A.nnz)
+    lib = ctypes.CDLL(lib_path)
+    fn = getattr(lib, "launch_%s" % kernel_name)
+    fn.argtypes = _SIGNATURES[kernel_name]
+
+    ip = A.indptr.astype(np.int64)
+    ind = A.indices.astype(np.int64)
+    dat = A.data.astype(np.float64)
+    x, w, B, U, V, alpha, beta = data
+    p = lambda arr: arr.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+    pi = lambda arr: arr.ctypes.data_as(ctypes.POINTER(ctypes.c_longlong))
+
+    if kernel_name == "spmv":
+        out = np.zeros(M, dtype=np.float64)
+        fn(pi(ip), pi(ind), p(dat), p(x), p(out), M, N, nnz)
+    elif kernel_name == "spmm":
+        out = np.zeros((M, K), dtype=np.float64)
+        fn(pi(ip), pi(ind), p(dat), p(B), p(out), M, N, K, nnz)
+    elif kernel_name == "sddmm":
+        out = np.zeros(nnz, dtype=np.float64)
+        fn(pi(ip), pi(ind), p(dat), p(U), p(V), p(out), M, N, K, nnz)
+    elif kernel_name == "fused_spmv_axpy":
+        out = np.zeros(M, dtype=np.float64)
+        fn(pi(ip), pi(ind), p(dat), p(x), p(w), p(out), alpha, beta, M, N, nnz)
+    elif kernel_name == "axpy":
+        out = np.zeros(M, dtype=np.float64)
+        fn(p(x), p(w), p(out), alpha, beta, M)
+    else:
+        raise ValueError("unknown kernel %r" % kernel_name)
+    return out, lib, fn, (ip, ind, dat)
+
+
 def verify(
     kernel_name: str,
     config: "_codegen.Config",
@@ -319,33 +354,7 @@ def verify(
                             inject_bug=config.inject_bug,
                             message=log, config=config.to_dict())
 
-    lib = ctypes.CDLL(lib_path)
-    fn = getattr(lib, "launch_%s" % kernel_name)
-    fn.argtypes = _SIGNATURES[kernel_name]
-
-    ip = A.indptr.astype(np.int64)
-    ind = A.indices.astype(np.int64)
-    dat = A.data.astype(np.float64)
-    x, w, B, U, V, alpha, beta = data
-    out = np.zeros_like(ref)
-    p = lambda arr: arr.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-    pi = lambda arr: arr.ctypes.data_as(ctypes.POINTER(ctypes.c_longlong))
-
-    if kernel_name == "spmv":
-        fn(pi(ip), pi(ind), p(dat), p(x), p(out), M, N, nnz)
-    elif kernel_name == "spmm":
-        out = np.zeros((M, K), dtype=np.float64)
-        fn(pi(ip), pi(ind), p(dat), p(B), p(out), M, N, K, nnz)
-    elif kernel_name == "sddmm":
-        out = np.zeros(nnz, dtype=np.float64)
-        fn(pi(ip), pi(ind), p(dat), p(U), p(V), p(out), M, N, K, nnz)
-    elif kernel_name == "fused_spmv_axpy":
-        out = np.zeros(M, dtype=np.float64)
-        fn(pi(ip), pi(ind), p(dat), p(x), p(w), p(out), alpha, beta, M, N, nnz)
-    elif kernel_name == "axpy":
-        out = np.zeros(M, dtype=np.float64)
-        fn(p(x), p(w), p(out), alpha, beta, M)
-
+    out, _lib, _fn, _bufs = run_kernel(lib_path, kernel_name, A, data, K)
     out = np.asarray(out, dtype=np.float64).ravel()
     refv = np.asarray(ref, dtype=np.float64).ravel()
     diff = np.abs(out - refv)
