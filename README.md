@@ -40,8 +40,9 @@ fused = kernel("fused_spmv_axpy", [
 kernel spmv {
   assign y[i] = sum(j, (A[i, j] * x[j]))
   // loop nest
-for i:
+  for i:
     for j in reduce(A row):
+      assign y[i] = sum(j, (A[i, j] * x[j]))
 }
 ```
 

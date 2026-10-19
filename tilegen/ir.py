@@ -577,42 +577,52 @@ def _pretty_nest(kernel: Kernel) -> str:
     lines: List[str] = []
     sparse = kernel.sparse_tensor()
 
-    def visit(expr: Expr, depth: int) -> None:
-        pad = "    " * depth
-        if isinstance(expr, Reduce):
-            lines.append("%sfor %s in reduce(%s):" % (pad, expr.index.name, _src(expr.index)))
-            visit(expr.body, depth + 1)
-        elif isinstance(expr, Mul):
-            visit(expr.left, depth)
-            visit(expr.right, depth)
-        elif isinstance(expr, Add):
-            visit(expr.left, depth)
-            visit(expr.right, depth)
-
-    def _src(idx: Index) -> str:
-        sparse_local = kernel.sparse_tensor()
-        if sparse is not None and sparse_local is not None:
-            for pos, ix in enumerate(sparse_local.format.levels):
-                if ix == "compressed" and pos < len(_sparse_indices(sparse_local)):
-                    if _sparse_indices(sparse_local)[pos].name == idx.name:
-                        return "%s row" % sparse_local.name
-        return "dense"
-
     def _sparse_indices(t: TensorDecl) -> List[Index]:
-        found: List[Index] = []
         for st in kernel.stmts:
             for node in st.rhs.walk():
                 if isinstance(node, Access) and node.tensor.name == t.name:
                     return node.indices
+        return []
+
+    def _src(idx: Index) -> str:
+        if sparse is not None:
+            indices = _sparse_indices(sparse)
+            for pos, level in enumerate(sparse.format.levels):
+                if level == "compressed" and pos < len(indices):
+                    if indices[pos].name == idx.name:
+                        return "%s row" % sparse.name
+        return "dense"
+
+    def _reductions(expr: Expr) -> List[Reduce]:
+        """Reduction loops in the order they wrap this expression's leaves."""
+        found: List[Reduce] = []
+        if isinstance(expr, Reduce):
+            found.append(expr)
+            found.extend(_reductions(expr.body))
+        elif isinstance(expr, (Mul, Add)):
+            found.extend(_reductions(expr.left))
+            found.extend(_reductions(expr.right))
         return found
 
     free = kernel.free_indices()
+    depth = 1  # opening indent inside "kernel <name> {"
     if free:
-        lines.append("for %s:" % ", ".join(i.name for i in free))
+        lines.append("  for %s:" % ", ".join(i.name for i in free))
+        depth = 2
     for st in kernel.stmts:
-        visit(st.rhs, 1)
-    if not free:
-        lines.append("    (elementwise)")
+        stmt_depth = depth
+        for red in _reductions(st.rhs):
+            lines.append(
+                "%sfor %s in reduce(%s):"
+                % ("  " * stmt_depth, red.index.name, _src(red.index))
+            )
+            stmt_depth += 1
+        lines.append(
+            "%sassign %s = %s"
+            % ("  " * stmt_depth, _fmt_access(st.lhs), _fmt_expr(st.rhs))
+        )
+    if not kernel.stmts:
+        lines.append("  (empty)")
     return "\n".join(lines)
 
 
