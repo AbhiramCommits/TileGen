@@ -116,7 +116,7 @@ make matrices       # generate data/matrices/*.npz + manifest.json
 make build          # cmake -S cpp -B build/cpp && cmake --build build/cpp -j
 make test           # Catch2 tilegen_tests + pytest
 make verify         # differential verification sweep -> results/correctness.json
-make tune           # autotune sweep -> results/autotune.{json,csv}, best_configs.json
+make tune           # compact summary -> results/; full sweep -> build/autotune.{json,csv}
 make report         # results/REPORT.md + correctness_summary.md
 make all BUDGET=6   # full pipeline end-to-end with a small budget (CI uses this)
 make clean
@@ -157,7 +157,8 @@ Generated deterministically with seed 1234 (`data/matrices/manifest.json`):
 **Which backend produced the numbers:** the `cpu` backend. No NVIDIA GPU or `nvcc` was available,
 so no GPU timings exist and none are reported. The CUDA sources were still emitted and validated
 with the text-level structural check (`tilegen.verify.syntax_check_cuda_text`), which is logged
-honestly in `results/autotune.json` / the verification messages.
+honestly in `build/autotune.json` (the full sweep; `results/autotune.json` keeps the
+compact best-per-class and top-5 summary) / the verification messages.
 
 **Scale of the build (all traceable to `results/`):**
 

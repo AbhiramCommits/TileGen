@@ -13,6 +13,9 @@ dist/
 # Generated / build artifacts
 build/
 !build/.gitkeep
+# Full autotuner sweep (results/ keeps only the compact summary)
+build/autotune.json
+build/autotune.csv
 *.o
 *.so
 *.dylib

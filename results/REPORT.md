@@ -58,4 +58,4 @@ Mean fusion speedup over the corpus: **1.11x** (fused_spmv_axpy vs separate spmv
 
 ## Pruning
 
-180 illegal configurations were pruned (e.g. threads_per_row > block_size, vector_width > unroll, block_size not divisible by threads_per_row). The full list is in results/autotune.json.
+180 illegal configurations were pruned (e.g. threads_per_row > block_size, vector_width > unroll, block_size not divisible by threads_per_row). The full list is in build/autotune.json; results/autotune.json is the compact summary.

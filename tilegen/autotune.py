@@ -286,31 +286,75 @@ def tune(
     }
 
 
+_METRIC_FIELDS = [
+    "ms_mean", "ms_min", "ms_median", "gflops", "bandwidth_gbs",
+    "max_abs_err", "tolerance", "ok", "speedup_vs_naive",
+]
+
+_CSV_COLS = ["matrix_class", "kernel", "tile_size", "threads_per_row", "unroll",
+             "vector_width", "block_size", "ms_mean", "ms_min", "ms_median",
+             "gflops", "bandwidth_gbs", "max_abs_err", "ok", "speedup_vs_naive"]
+
+
+def _compact_metrics(record: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Drop verbose per-variant details (compile logs, duplicated config)."""
+    if record is None:
+        return None
+    return {key: record.get(key) for key in _METRIC_FIELDS if key in record}
+
+
+def _flat_row(record: Dict[str, Any]) -> Dict[str, Any]:
+    row = {"matrix_class": record["matrix_class"], "kernel": record["kernel"]}
+    row.update(record["config"])
+    row.update({key: record.get(key) for key in _METRIC_FIELDS if key in record})
+    return row
+
+
+def _write_csv(path: str, rows: List[Dict[str, Any]]) -> None:
+    with open(path, "w") as fh:
+        fh.write(",".join(_CSV_COLS) + "\n")
+        for row in rows:
+            fh.write(",".join(str(row.get(c, "")) for c in _CSV_COLS) + "\n")
+
+
 def write_outputs(all_results: List[Dict[str, Any]], outdir: str, env: Dict[str, Any],
-                  pruned: List[Dict[str, str]]) -> None:
+                  pruned: List[Dict[str, str]], full_outdir: str = "build") -> None:
+    """Write a compact summary to ``outdir`` and the full sweep to ``full_outdir``."""
     os.makedirs(outdir, exist_ok=True)
+    os.makedirs(full_outdir, exist_ok=True)
+
     best: Dict[str, Dict[str, Any]] = {}
     flat: List[Dict[str, Any]] = []
+    compact_results: List[Dict[str, Any]] = []
+    top5: Dict[str, List[Dict[str, Any]]] = {}
+
     for res in all_results:
-        best.setdefault(res["matrix_class"], {})[res["kernel"]] = {
+        cls = res["matrix_class"]
+        compact_results.append({
+            "kernel": res["kernel"],
+            "matrix_class": cls,
+            "baseline": res["baseline"],
+            "baseline_ms_min": res["baseline_ms_min"],
+            "winner": res["winner"],
+            "winner_metrics": _compact_metrics(res["winner_metrics"]),
+        })
+        best.setdefault(cls, {})[res["kernel"]] = {
             "config": res["winner"],
-            "metrics": res["winner_metrics"],
+            "metrics": _compact_metrics(res["winner_metrics"]),
             "baseline_ms_min": res["baseline_ms_min"],
         }
         for r in res["records"]:
             if "ms_min" in r and r["ms_min"] is not None:
-                row = {"matrix_class": r["matrix_class"], "kernel": r["kernel"]}
-                row.update(r["config"])
-                row.update({
-                    "ms_mean": r["ms_mean"], "ms_min": r["ms_min"],
-                    "ms_median": r["ms_median"], "gflops": r["gflops"],
-                    "bandwidth_gbs": r["bandwidth_gbs"],
-                    "max_abs_err": r["max_abs_err"], "ok": r["ok"],
-                    "speedup_vs_naive": r["speedup_vs_naive"],
-                })
-                flat.append(row)
+                flat.append(_flat_row(r))
+                if r.get("ok"):
+                    candidate = _flat_row(r)
+                    top5.setdefault(cls, []).append(candidate)
 
-    with open(os.path.join(outdir, "autotune.json"), "w") as fh:
+    for cls in top5:
+        top5[cls] = sorted(top5[cls], key=lambda r: r["ms_median"])[:5]
+
+    # Full sweep (large, reproducible artifact): ignored by git under build/.
+    with open(os.path.join(full_outdir, "autotune.json"), "w") as fh:
         json.dump({
             "hardware": env,
             "baseline": BASELINE.to_dict(),
@@ -318,14 +362,22 @@ def write_outputs(all_results: List[Dict[str, Any]], outdir: str, env: Dict[str,
             "pruned": pruned,
             "results": all_results,
         }, fh, indent=2)
+    _write_csv(os.path.join(full_outdir, "autotune.csv"), flat)
+
+    # Compact, tracked summary: per-pair winners plus the top five per class.
+    with open(os.path.join(outdir, "autotune.json"), "w") as fh:
+        json.dump({
+            "hardware": env,
+            "baseline": BASELINE.to_dict(),
+            "search_space": SEARCH_SPACE,
+            "pruned": pruned,
+            "results": compact_results,
+            "best": best,
+            "top5": top5,
+        }, fh, indent=2)
 
     with open(os.path.join(outdir, "best_configs.json"), "w") as fh:
         json.dump(best, fh, indent=2)
 
-    cols = ["matrix_class", "kernel", "tile_size", "threads_per_row", "unroll",
-            "vector_width", "block_size", "ms_mean", "ms_min", "ms_median",
-            "gflops", "bandwidth_gbs", "max_abs_err", "ok", "speedup_vs_naive"]
-    with open(os.path.join(outdir, "autotune.csv"), "w") as fh:
-        fh.write(",".join(cols) + "\n")
-        for row in flat:
-            fh.write(",".join(str(row.get(c, "")) for c in cols) + "\n")
+    _write_csv(os.path.join(outdir, "autotune.csv"),
+               [row for cls in sorted(top5) for row in top5[cls]])

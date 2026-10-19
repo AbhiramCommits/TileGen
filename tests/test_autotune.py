@@ -58,12 +58,23 @@ def test_tune_smoke(tmp_path):
 def test_write_outputs_schema(tmp_path):
     res = tune("spmv", _small_matrix(), budget=2, backend="cpu",
                workdir=str(tmp_path / "gen"), warmup=1, iters=2)
-    write_outputs([res], str(tmp_path), {"backend": "cpu"}, prune_log())
+    full = tmp_path / "full"
+    write_outputs([res], str(tmp_path), {"backend": "cpu"}, prune_log(),
+                  full_outdir=str(full))
     for name in ["autotune.json", "autotune.csv", "best_configs.json"]:
         assert os.path.exists(str(tmp_path / name))
     with open(str(tmp_path / "autotune.json")) as fh:
         data = json.load(fh)
     assert "results" in data and "pruned" in data and "hardware" in data
+    assert "best" in data and "top5" in data
+    # The tracked summary has no per-variant records; the full sweep does.
+    assert all("records" not in r for r in data["results"])
+    assert "tiny" in data["best"] and "spmv" in data["best"]["tiny"]
+    assert data["top5"]["tiny"]
+    assert len(data["top5"]["tiny"]) <= 5
     with open(str(tmp_path / "best_configs.json")) as fh:
         best = json.load(fh)
     assert "tiny" in best and "spmv" in best["tiny"]
+    with open(str(full / "autotune.json")) as fh:
+        raw = json.load(fh)
+    assert raw["results"][0]["records"]

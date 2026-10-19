@@ -25,7 +25,10 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--budget", type=int, default=40,
                     help="max variants per (kernel, matrix) pair")
-    ap.add_argument("--out", default="results")
+    ap.add_argument("--out", default="results",
+                    help="compact summary directory")
+    ap.add_argument("--full-out", default="build",
+                    help="directory for the full raw sweep")
     ap.add_argument("--mode", default="random", choices=["random", "coordinate"])
     ap.add_argument("--backend", default=None, help="cpu|cuda (default: probe)")
     ap.add_argument("--kernels", default=",".join(ALL_KERNELS))
@@ -67,9 +70,11 @@ def main(argv=None) -> int:
                 print("%-16s %-18s no legal/verified variant" % (class_name, kernel))
 
     from tilegen.autotune import prune_log
-    write_outputs(all_results, args.out, env, prune_log())
-    print("\nwrote %s/autotune.json, %s/autotune.csv, %s/best_configs.json"
-          % (args.out, args.out, args.out))
+    write_outputs(all_results, args.out, env, prune_log(), full_outdir=args.full_out)
+    print("\nwrote compact summary to %s/autotune.json, %s/autotune.csv, "
+          "%s/best_configs.json" % (args.out, args.out, args.out))
+    print("wrote full sweep to %s/autotune.json and %s/autotune.csv"
+          % (args.full_out, args.full_out))
     return 0
 
 

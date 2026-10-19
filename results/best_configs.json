@@ -11,20 +11,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "spmv",
-        "matrix_class": "banded",
-        "rows": 200000,
-        "nnz": 1399988,
-        "config": {
-          "tile_size": 128,
-          "threads_per_row": 1,
-          "unroll": 4,
-          "vector_width": 4,
-          "block_size": 512,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.3419149200000149,
         "ms_min": 0.26566699999985843,
         "ms_median": 0.2947919999991555,
@@ -33,7 +19,6 @@
         "max_abs_err": 0.0,
         "tolerance": 1.6570094891273273e-12,
         "ok": true,
-        "log": "compiled spmv_8d71e048c4.cpp with: -std=c++17 -shared -fPIC -o build/generated/spmv_8d71e048c4.dylib build/generated/spmv_8d71e048c4.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.153075090244823
       },
       "baseline_ms_min": 0.3063339999999082
@@ -49,20 +34,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "spmm",
-        "matrix_class": "banded",
-        "rows": 200000,
-        "nnz": 1399988,
-        "config": {
-          "tile_size": 32,
-          "threads_per_row": 32,
-          "unroll": 1,
-          "vector_width": 1,
-          "block_size": 256,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 1.0895515600003591,
         "ms_min": 0.8523750000009045,
         "ms_median": 1.0205829999989646,
@@ -71,7 +42,6 @@
         "max_abs_err": 0.0,
         "tolerance": 1.717598892729275e-12,
         "ok": true,
-        "log": "compiled spmm_cc72107874.cpp with: -std=c++17 -shared -fPIC -o build/generated/spmm_cc72107874.dylib build/generated/spmm_cc72107874.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.0809502859633673
       },
       "baseline_ms_min": 0.9213749999990029
@@ -87,20 +57,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "sddmm",
-        "matrix_class": "banded",
-        "rows": 200000,
-        "nnz": 1399988,
-        "config": {
-          "tile_size": 32,
-          "threads_per_row": 32,
-          "unroll": 1,
-          "vector_width": 1,
-          "block_size": 256,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.9137766799995006,
         "ms_min": 0.7690410000051884,
         "ms_median": 0.8591249999980732,
@@ -109,7 +65,6 @@
         "max_abs_err": 5.684341886080802e-14,
         "tolerance": 3.5540730846274443e-12,
         "ok": true,
-        "log": "compiled sddmm_cc72107874.cpp with: -std=c++17 -shared -fPIC -o build/generated/sddmm_cc72107874.dylib build/generated/sddmm_cc72107874.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.0057981303934047
       },
       "baseline_ms_min": 0.7735000000010928
@@ -125,20 +80,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "fused_spmv_axpy",
-        "matrix_class": "banded",
-        "rows": 200000,
-        "nnz": 1399988,
-        "config": {
-          "tile_size": 32,
-          "threads_per_row": 32,
-          "unroll": 8,
-          "vector_width": 1,
-          "block_size": 128,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.3086715999992862,
         "ms_min": 0.25766600000309836,
         "ms_median": 0.2960420000022168,
@@ -147,7 +88,6 @@
         "max_abs_err": 7.105427357601002e-15,
         "tolerance": 1.4636700365636764e-12,
         "ok": true,
-        "log": "compiled fused_spmv_axpy_8f267de6d4.cpp with: -std=c++17 -shared -fPIC -o build/generated/fused_spmv_axpy_8f267de6d4.dylib build/generated/fused_spmv_axpy_8f267de6d4.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.0693766348444016
       },
       "baseline_ms_min": 0.2755419999971309
@@ -163,20 +103,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "axpy",
-        "matrix_class": "banded",
-        "rows": 200000,
-        "nnz": 1399988,
-        "config": {
-          "tile_size": 128,
-          "threads_per_row": 2,
-          "unroll": 2,
-          "vector_width": 2,
-          "block_size": 256,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.04865163999994593,
         "ms_min": 0.04004200000196079,
         "ms_median": 0.046040999997387644,
@@ -185,7 +111,6 @@
         "max_abs_err": 8.881784197001252e-16,
         "tolerance": 1.0862947762789742e-12,
         "ok": true,
-        "log": "compiled axpy_daa8fcb898.cpp with: -std=c++17 -shared -fPIC -o build/generated/axpy_daa8fcb898.dylib build/generated/axpy_daa8fcb898.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.0010239248748223
       },
       "baseline_ms_min": 0.04008300000180043
@@ -203,20 +128,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "spmv",
-        "matrix_class": "uniform_random",
-        "rows": 100000,
-        "nnz": 1599890,
-        "config": {
-          "tile_size": 32,
-          "threads_per_row": 1,
-          "unroll": 1,
-          "vector_width": 1,
-          "block_size": 128,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.5161433600005694,
         "ms_min": 0.3748330000021838,
         "ms_median": 0.4660419999993337,
@@ -225,7 +136,6 @@
         "max_abs_err": 0.0,
         "tolerance": 1.5607582627254113e-12,
         "ok": true,
-        "log": "compiled spmv_244f7c2517.cpp with: -std=c++17 -shared -fPIC -o build/generated/spmv_244f7c2517.dylib build/generated/spmv_244f7c2517.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.0
       },
       "baseline_ms_min": 0.3748330000021838
@@ -241,20 +151,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "spmm",
-        "matrix_class": "uniform_random",
-        "rows": 100000,
-        "nnz": 1599890,
-        "config": {
-          "tile_size": 32,
-          "threads_per_row": 32,
-          "unroll": 1,
-          "vector_width": 1,
-          "block_size": 256,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 2.7174516799999537,
         "ms_min": 2.066874999997026,
         "ms_median": 2.362875000002873,
@@ -263,7 +159,6 @@
         "max_abs_err": 0.0,
         "tolerance": 1.7145852369664632e-12,
         "ok": true,
-        "log": "compiled spmm_cc72107874.cpp with: -std=c++17 -shared -fPIC -o build/generated/spmm_cc72107874.dylib build/generated/spmm_cc72107874.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.1009978832808778
       },
       "baseline_ms_min": 2.27562500000289
@@ -279,20 +174,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "sddmm",
-        "matrix_class": "uniform_random",
-        "rows": 100000,
-        "nnz": 1599890,
-        "config": {
-          "tile_size": 32,
-          "threads_per_row": 32,
-          "unroll": 8,
-          "vector_width": 1,
-          "block_size": 128,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 2.2156100800009426,
         "ms_min": 1.5450839999999744,
         "ms_median": 1.9238750000027949,
@@ -301,7 +182,6 @@
         "max_abs_err": 1.4210854715202004e-14,
         "tolerance": 2.260136328270169e-12,
         "ok": true,
-        "log": "compiled sddmm_8f267de6d4.cpp with: -std=c++17 -shared -fPIC -o build/generated/sddmm_8f267de6d4.dylib build/generated/sddmm_8f267de6d4.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 0.9426671947954458
       },
       "baseline_ms_min": 1.4565000000033024
@@ -317,20 +197,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "fused_spmv_axpy",
-        "matrix_class": "uniform_random",
-        "rows": 100000,
-        "nnz": 1599890,
-        "config": {
-          "tile_size": 32,
-          "threads_per_row": 1,
-          "unroll": 8,
-          "vector_width": 1,
-          "block_size": 128,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.558250079999425,
         "ms_min": 0.45583399999316043,
         "ms_median": 0.5035000000077616,
@@ -339,7 +205,6 @@
         "max_abs_err": 1.7763568394002505e-15,
         "tolerance": 1.4277034302496899e-12,
         "ok": true,
-        "log": "compiled fused_spmv_axpy_bce3e9a687.cpp with: -std=c++17 -shared -fPIC -o build/generated/fused_spmv_axpy_bce3e9a687.dylib build/generated/fused_spmv_axpy_bce3e9a687.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.042868675879022
       },
       "baseline_ms_min": 0.4753749999935053
@@ -355,20 +220,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "axpy",
-        "matrix_class": "uniform_random",
-        "rows": 100000,
-        "nnz": 1599890,
-        "config": {
-          "tile_size": 128,
-          "threads_per_row": 2,
-          "unroll": 4,
-          "vector_width": 2,
-          "block_size": 256,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.03404167999860874,
         "ms_min": 0.029458000000204265,
         "ms_median": 0.0325829999923144,
@@ -377,7 +228,6 @@
         "max_abs_err": 8.881784197001252e-16,
         "tolerance": 1.1855855540151154e-12,
         "ok": true,
-        "log": "compiled axpy_b8fb33e4f6.cpp with: -std=c++17 -shared -fPIC -o build/generated/axpy_b8fb33e4f6.dylib build/generated/axpy_b8fb33e4f6.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.4950777377507567
       },
       "baseline_ms_min": 0.044041999998967185
@@ -395,20 +245,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "spmv",
-        "matrix_class": "power_law",
-        "rows": 100000,
-        "nnz": 804454,
-        "config": {
-          "tile_size": 32,
-          "threads_per_row": 32,
-          "unroll": 4,
-          "vector_width": 1,
-          "block_size": 128,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.327895079997802,
         "ms_min": 0.2962089999982709,
         "ms_median": 0.31808399999988524,
@@ -417,7 +253,6 @@
         "max_abs_err": 0.0,
         "tolerance": 3.1015923886076604e-10,
         "ok": true,
-        "log": "compiled spmv_ddfca4775f.cpp with: -std=c++17 -shared -fPIC -o build/generated/spmv_ddfca4775f.dylib build/generated/spmv_ddfca4775f.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 0.966378469269039
       },
       "baseline_ms_min": 0.2862500000020418
@@ -433,20 +268,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "spmm",
-        "matrix_class": "power_law",
-        "rows": 100000,
-        "nnz": 804454,
-        "config": {
-          "tile_size": 64,
-          "threads_per_row": 8,
-          "unroll": 1,
-          "vector_width": 1,
-          "block_size": 128,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 1.7353266399993572,
         "ms_min": 1.0497090000001208,
         "ms_median": 1.6768330000047627,
@@ -455,7 +276,6 @@
         "max_abs_err": 0.0,
         "tolerance": 4.105135349541528e-10,
         "ok": true,
-        "log": "compiled spmm_f1bf4d67f4.cpp with: -std=c++17 -shared -fPIC -o build/generated/spmm_f1bf4d67f4.dylib build/generated/spmm_f1bf4d67f4.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.4645325513902492
       },
       "baseline_ms_min": 1.537332999987484
@@ -471,20 +291,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "sddmm",
-        "matrix_class": "power_law",
-        "rows": 100000,
-        "nnz": 804454,
-        "config": {
-          "tile_size": 64,
-          "threads_per_row": 2,
-          "unroll": 8,
-          "vector_width": 2,
-          "block_size": 512,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 1.2631666799973118,
         "ms_min": 0.8032080000077713,
         "ms_median": 1.0059580000074675,
@@ -493,7 +299,6 @@
         "max_abs_err": 7.105427357601002e-15,
         "tolerance": 2.086747296788907e-10,
         "ok": true,
-        "log": "compiled sddmm_1d8ed5d07e.cpp with: -std=c++17 -shared -fPIC -o build/generated/sddmm_1d8ed5d07e.dylib build/generated/sddmm_1d8ed5d07e.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.06193912409687
       },
       "baseline_ms_min": 0.8529579999958514
@@ -509,20 +314,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "fused_spmv_axpy",
-        "matrix_class": "power_law",
-        "rows": 100000,
-        "nnz": 804454,
-        "config": {
-          "tile_size": 32,
-          "threads_per_row": 32,
-          "unroll": 8,
-          "vector_width": 2,
-          "block_size": 512,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.3574149200028387,
         "ms_min": 0.30445800001643875,
         "ms_median": 0.3327499999841166,
@@ -531,7 +322,6 @@
         "max_abs_err": 7.105427357601002e-15,
         "tolerance": 2.2711920539812667e-10,
         "ok": true,
-        "log": "compiled fused_spmv_axpy_f83f274a13.cpp with: -std=c++17 -shared -fPIC -o build/generated/fused_spmv_axpy_f83f274a13.dylib build/generated/fused_spmv_axpy_f83f274a13.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.0904623953651549
       },
       "baseline_ms_min": 0.33199999998601015
@@ -547,20 +337,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "axpy",
-        "matrix_class": "power_law",
-        "rows": 100000,
-        "nnz": 804454,
-        "config": {
-          "tile_size": 128,
-          "threads_per_row": 1,
-          "unroll": 4,
-          "vector_width": 4,
-          "block_size": 512,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.04012156000271716,
         "ms_min": 0.03433399999153153,
         "ms_median": 0.04041599999027312,
@@ -569,7 +345,6 @@
         "max_abs_err": 8.881784197001252e-16,
         "tolerance": 2.4082203280629974e-11,
         "ok": true,
-        "log": "compiled axpy_8d71e048c4.cpp with: -std=c++17 -shared -fPIC -o build/generated/axpy_8d71e048c4.dylib build/generated/axpy_8d71e048c4.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.5533581879225995
       },
       "baseline_ms_min": 0.05333300001097996
@@ -587,20 +362,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "spmv",
-        "matrix_class": "diagonal_heavy",
-        "rows": 200000,
-        "nnz": 599998,
-        "config": {
-          "tile_size": 64,
-          "threads_per_row": 32,
-          "unroll": 2,
-          "vector_width": 1,
-          "block_size": 512,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.145041799999035,
         "ms_min": 0.11237499998628664,
         "ms_median": 0.14220899998917957,
@@ -609,7 +370,6 @@
         "max_abs_err": 0.0,
         "tolerance": 1.279248116040363e-12,
         "ok": true,
-        "log": "compiled spmv_c6da36e095.cpp with: -std=c++17 -shared -fPIC -o build/generated/spmv_c6da36e095.dylib build/generated/spmv_c6da36e095.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.2291434927250122
       },
       "baseline_ms_min": 0.13812499997811756
@@ -625,20 +385,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "spmm",
-        "matrix_class": "diagonal_heavy",
-        "rows": 200000,
-        "nnz": 599998,
-        "config": {
-          "tile_size": 64,
-          "threads_per_row": 8,
-          "unroll": 1,
-          "vector_width": 1,
-          "block_size": 128,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.6339266800000587,
         "ms_min": 0.5286250000153814,
         "ms_median": 0.5784999999889351,
@@ -647,7 +393,6 @@
         "max_abs_err": 0.0,
         "tolerance": 1.305984345913814e-12,
         "ok": true,
-        "log": "compiled spmm_f1bf4d67f4.cpp with: -std=c++17 -shared -fPIC -o build/generated/spmm_f1bf4d67f4.dylib build/generated/spmm_f1bf4d67f4.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.0563556395811762
       },
       "baseline_ms_min": 0.5584159999898475
@@ -663,20 +408,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "sddmm",
-        "matrix_class": "diagonal_heavy",
-        "rows": 200000,
-        "nnz": 599998,
-        "config": {
-          "tile_size": 32,
-          "threads_per_row": 8,
-          "unroll": 8,
-          "vector_width": 1,
-          "block_size": 512,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.6005100799984575,
         "ms_min": 0.41970799998125585,
         "ms_median": 0.506207999990238,
@@ -685,7 +416,6 @@
         "max_abs_err": 5.684341886080802e-14,
         "tolerance": 2.042637423972207e-12,
         "ok": true,
-        "log": "compiled sddmm_eba215070d.cpp with: -std=c++17 -shared -fPIC -o build/generated/sddmm_eba215070d.dylib build/generated/sddmm_eba215070d.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.1524869671576525
       },
       "baseline_ms_min": 0.48370799999020164
@@ -701,20 +431,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "fused_spmv_axpy",
-        "matrix_class": "diagonal_heavy",
-        "rows": 200000,
-        "nnz": 599998,
-        "config": {
-          "tile_size": 64,
-          "threads_per_row": 8,
-          "unroll": 1,
-          "vector_width": 1,
-          "block_size": 128,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.15042004000520137,
         "ms_min": 0.12879200002657853,
         "ms_median": 0.14633400002139751,
@@ -723,7 +439,6 @@
         "max_abs_err": 3.552713678800501e-15,
         "tolerance": 1.1950263565410324e-12,
         "ok": true,
-        "log": "compiled fused_spmv_axpy_f1bf4d67f4.cpp with: -std=c++17 -shared -fPIC -o build/generated/fused_spmv_axpy_f1bf4d67f4.dylib build/generated/fused_spmv_axpy_f1bf4d67f4.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.2879293741776616
       },
       "baseline_ms_min": 0.16587499999332067
@@ -739,20 +454,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "axpy",
-        "matrix_class": "diagonal_heavy",
-        "rows": 200000,
-        "nnz": 599998,
-        "config": {
-          "tile_size": 64,
-          "threads_per_row": 4,
-          "unroll": 2,
-          "vector_width": 2,
-          "block_size": 128,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.04737503999990622,
         "ms_min": 0.04158300001222415,
         "ms_median": 0.04587500001207445,
@@ -761,7 +462,6 @@
         "max_abs_err": 8.881784197001252e-16,
         "tolerance": 1.0369834755481318e-12,
         "ok": true,
-        "log": "compiled axpy_9a2654a7ac.cpp with: -std=c++17 -shared -fPIC -o build/generated/axpy_9a2654a7ac.dylib build/generated/axpy_9a2654a7ac.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 0.9859798468051203
       },
       "baseline_ms_min": 0.04099999998175008
@@ -779,20 +479,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "spmv",
-        "matrix_class": "dense_rows",
-        "rows": 20000,
-        "nnz": 460083,
-        "config": {
-          "tile_size": 32,
-          "threads_per_row": 32,
-          "unroll": 4,
-          "vector_width": 1,
-          "block_size": 128,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.26949156000000585,
         "ms_min": 0.24695900000892834,
         "ms_median": 0.25379199999520097,
@@ -801,7 +487,6 @@
         "max_abs_err": 0.0,
         "tolerance": 4.6215491973026157e-10,
         "ok": true,
-        "log": "compiled spmv_ddfca4775f.cpp with: -std=c++17 -shared -fPIC -o build/generated/spmv_ddfca4775f.dylib build/generated/spmv_ddfca4775f.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.1348037528207013
       },
       "baseline_ms_min": 0.2802500000029795
@@ -817,20 +502,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "spmm",
-        "matrix_class": "dense_rows",
-        "rows": 20000,
-        "nnz": 460083,
-        "config": {
-          "tile_size": 32,
-          "threads_per_row": 1,
-          "unroll": 1,
-          "vector_width": 1,
-          "block_size": 128,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.9750199999973574,
         "ms_min": 0.7969170000023951,
         "ms_median": 0.8829170000126396,
@@ -839,7 +510,6 @@
         "max_abs_err": 0.0,
         "tolerance": 5.289206430867645e-10,
         "ok": true,
-        "log": "compiled spmm_244f7c2517.cpp with: -std=c++17 -shared -fPIC -o build/generated/spmm_244f7c2517.dylib build/generated/spmm_244f7c2517.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.0
       },
       "baseline_ms_min": 0.7969170000023951
@@ -855,20 +525,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "sddmm",
-        "matrix_class": "dense_rows",
-        "rows": 20000,
-        "nnz": 460083,
-        "config": {
-          "tile_size": 32,
-          "threads_per_row": 4,
-          "unroll": 4,
-          "vector_width": 4,
-          "block_size": 128,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.6149867599981462,
         "ms_min": 0.47312500001339686,
         "ms_median": 0.5342500000153905,
@@ -877,7 +533,6 @@
         "max_abs_err": 1.4210854715202004e-14,
         "tolerance": 1.747630860826344e-10,
         "ok": true,
-        "log": "compiled sddmm_5b6d9d01dd.cpp with: -std=c++17 -shared -fPIC -o build/generated/sddmm_5b6d9d01dd.dylib build/generated/sddmm_5b6d9d01dd.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.057067371176561
       },
       "baseline_ms_min": 0.5001250000020718
@@ -893,20 +548,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "fused_spmv_axpy",
-        "matrix_class": "dense_rows",
-        "rows": 20000,
-        "nnz": 460083,
-        "config": {
-          "tile_size": 32,
-          "threads_per_row": 32,
-          "unroll": 8,
-          "vector_width": 1,
-          "block_size": 128,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.27419667999879493,
         "ms_min": 0.2511249999770371,
         "ms_median": 0.256124999992835,
@@ -915,7 +556,6 @@
         "max_abs_err": 7.105427357601002e-15,
         "tolerance": 3.266380086925151e-10,
         "ok": true,
-        "log": "compiled fused_spmv_axpy_8f267de6d4.cpp with: -std=c++17 -shared -fPIC -o build/generated/fused_spmv_axpy_8f267de6d4.dylib build/generated/fused_spmv_axpy_8f267de6d4.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.0438028871282308
       },
       "baseline_ms_min": 0.26212500000610817
@@ -931,20 +571,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "axpy",
-        "matrix_class": "dense_rows",
-        "rows": 20000,
-        "nnz": 460083,
-        "config": {
-          "tile_size": 32,
-          "threads_per_row": 4,
-          "unroll": 2,
-          "vector_width": 1,
-          "block_size": 512,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.026000000000294676,
         "ms_min": 0.02333300000145755,
         "ms_median": 0.025582999995776845,
@@ -953,7 +579,6 @@
         "max_abs_err": 8.881784197001252e-16,
         "tolerance": 2.646234719488696e-11,
         "ok": true,
-        "log": "compiled axpy_037e1b02bf.cpp with: -std=c++17 -shared -fPIC -o build/generated/axpy_037e1b02bf.dylib build/generated/axpy_037e1b02bf.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.2714610210854003
       },
       "baseline_ms_min": 0.029667000006838862
@@ -971,20 +596,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "spmv",
-        "matrix_class": "blocked",
-        "rows": 100000,
-        "nnz": 1600000,
-        "config": {
-          "tile_size": 32,
-          "threads_per_row": 32,
-          "unroll": 8,
-          "vector_width": 2,
-          "block_size": 512,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.3586798799983626,
         "ms_min": 0.2892080000265196,
         "ms_median": 0.3174160000014581,
@@ -993,7 +604,6 @@
         "max_abs_err": 0.0,
         "tolerance": 1.5591896033609141e-12,
         "ok": true,
-        "log": "compiled spmv_f83f274a13.cpp with: -std=c++17 -shared -fPIC -o build/generated/spmv_f83f274a13.dylib build/generated/spmv_f83f274a13.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.0390445630174185
       },
       "baseline_ms_min": 0.3005000000086966
@@ -1009,20 +619,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "spmm",
-        "matrix_class": "blocked",
-        "rows": 100000,
-        "nnz": 1600000,
-        "config": {
-          "tile_size": 32,
-          "threads_per_row": 1,
-          "unroll": 1,
-          "vector_width": 1,
-          "block_size": 128,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 1.725901680001698,
         "ms_min": 1.262542000006306,
         "ms_median": 1.4904589999957807,
@@ -1031,7 +627,6 @@
         "max_abs_err": 0.0,
         "tolerance": 1.6527823879781351e-12,
         "ok": true,
-        "log": "compiled spmm_244f7c2517.cpp with: -std=c++17 -shared -fPIC -o build/generated/spmm_244f7c2517.dylib build/generated/spmm_244f7c2517.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.0
       },
       "baseline_ms_min": 1.262542000006306
@@ -1047,20 +642,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "sddmm",
-        "matrix_class": "blocked",
-        "rows": 100000,
-        "nnz": 1600000,
-        "config": {
-          "tile_size": 32,
-          "threads_per_row": 4,
-          "unroll": 8,
-          "vector_width": 1,
-          "block_size": 512,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 1.195975000002818,
         "ms_min": 0.8572500000241234,
         "ms_median": 1.1025000000017826,
@@ -1069,7 +650,6 @@
         "max_abs_err": 1.4210854715202004e-14,
         "tolerance": 2.295870551167493e-12,
         "ok": true,
-        "log": "compiled sddmm_21b470d562.cpp with: -std=c++17 -shared -fPIC -o build/generated/sddmm_21b470d562.dylib build/generated/sddmm_21b470d562.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.2096331291750184
       },
       "baseline_ms_min": 1.0369580000144651
@@ -1085,20 +665,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "fused_spmv_axpy",
-        "matrix_class": "blocked",
-        "rows": 100000,
-        "nnz": 1600000,
-        "config": {
-          "tile_size": 32,
-          "threads_per_row": 32,
-          "unroll": 8,
-          "vector_width": 2,
-          "block_size": 512,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.3675766400010616,
         "ms_min": 0.2920000000017353,
         "ms_median": 0.3332080000006954,
@@ -1107,7 +673,6 @@
         "max_abs_err": 1.7763568394002505e-15,
         "tolerance": 1.4094979958159761e-12,
         "ok": true,
-        "log": "compiled fused_spmv_axpy_f83f274a13.cpp with: -std=c++17 -shared -fPIC -o build/generated/fused_spmv_axpy_f83f274a13.dylib build/generated/fused_spmv_axpy_f83f274a13.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.1515410958962444
       },
       "baseline_ms_min": 0.33625000000370164
@@ -1123,20 +688,6 @@
         "inject_bug": false
       },
       "metrics": {
-        "kernel": "axpy",
-        "matrix_class": "blocked",
-        "rows": 100000,
-        "nnz": 1600000,
-        "config": {
-          "tile_size": 64,
-          "threads_per_row": 4,
-          "unroll": 8,
-          "vector_width": 1,
-          "block_size": 128,
-          "dtype": "f64",
-          "inject_bug": false
-        },
-        "skipped": null,
         "ms_mean": 0.03728515999682713,
         "ms_min": 0.031292000016946986,
         "ms_median": 0.03645900000037727,
@@ -1145,7 +696,6 @@
         "max_abs_err": 8.881784197001252e-16,
         "tolerance": 1.1855855540151154e-12,
         "ok": true,
-        "log": "compiled axpy_3dff26e3bd.cpp with: -std=c++17 -shared -fPIC -o build/generated/axpy_3dff26e3bd.dylib build/generated/axpy_3dff26e3bd.cpp -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp",
         "speedup_vs_naive": 1.230346414279465
       },
       "baseline_ms_min": 0.03850000001648368

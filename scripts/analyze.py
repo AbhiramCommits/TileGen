@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Turn the raw autotuning data into human-readable reports.
 
-Reads results/autotune.json and results/correctness.json and writes
+Reads the full sweep from build/autotune.json (falling back to the compact
+results/autotune.json) plus results/correctness.json, and writes
 results/REPORT.md and results/correctness_summary.md (plus an optional PNG).
 """
 
@@ -122,7 +123,9 @@ def _fusion_section(results):
 
 def main() -> int:
     os.makedirs(RESULTS, exist_ok=True)
-    auto = _load(os.path.join(RESULTS, "autotune.json"))
+    full_path = os.path.join("build", "autotune.json")
+    compact_path = os.path.join(RESULTS, "autotune.json")
+    auto = _load(full_path if os.path.exists(full_path) else compact_path)
     results = auto["results"]
     manifest = _imbalance_map()
     env = auto.get("hardware", {})
@@ -168,7 +171,8 @@ def main() -> int:
     out.append("")
     out.append("%d illegal configurations were pruned (e.g. threads_per_row > "
                "block_size, vector_width > unroll, block_size not divisible by "
-               "threads_per_row). The full list is in results/autotune.json." %
+               "threads_per_row). The full list is in build/autotune.json; "
+               "results/autotune.json is the compact summary." %
                len(auto.get("pruned", [])))
     out.append("")
 
