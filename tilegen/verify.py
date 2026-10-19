@@ -44,6 +44,124 @@ F64P = ctypes.POINTER(ctypes.c_double)
 _darwin = platform.system() == "Darwin"
 _SOEXT = "dylib" if _darwin else "so"
 
+_CUDA_HOST_TO_DEVICE = 1
+_CUDA_DEVICE_TO_HOST = 2
+_cudart = None
+
+
+def _cuda_runtime():
+    """Load the CUDA runtime shared library used for device-buffer transfers."""
+    global _cudart
+    if _cudart is not None:
+        return _cudart
+
+    import ctypes.util
+    import glob
+
+    candidates = []
+    found = ctypes.util.find_library("cudart")
+    if found:
+        candidates.append(found)
+    candidates += sorted(glob.glob("/usr/local/cuda*/lib64/libcudart.so*"), reverse=True)
+    candidates += ["libcudart.so", "libcudart.so.13", "libcudart.so.12",
+                   "libcudart.so.11.0"]
+
+    last_error = None
+    for candidate in candidates:
+        try:
+            lib = ctypes.CDLL(candidate)
+        except OSError as exc:
+            last_error = exc
+            continue
+        lib.cudaMalloc.argtypes = [ctypes.POINTER(ctypes.c_void_p), ctypes.c_size_t]
+        lib.cudaMalloc.restype = ctypes.c_int
+        lib.cudaMemcpy.argtypes = [ctypes.c_void_p, ctypes.c_void_p,
+                                   ctypes.c_size_t, ctypes.c_int]
+        lib.cudaMemcpy.restype = ctypes.c_int
+        lib.cudaFree.argtypes = [ctypes.c_void_p]
+        lib.cudaFree.restype = ctypes.c_int
+        lib.cudaDeviceSynchronize.argtypes = []
+        lib.cudaDeviceSynchronize.restype = ctypes.c_int
+        lib.cudaGetErrorString.argtypes = [ctypes.c_int]
+        lib.cudaGetErrorString.restype = ctypes.c_char_p
+        _cudart = lib
+        return _cudart
+
+    raise RuntimeError("could not load the CUDA runtime library: %s" % last_error)
+
+
+def _cuda_check(code: int, what: str) -> None:
+    if code == 0:
+        return
+    lib = _cuda_runtime()
+    message = lib.cudaGetErrorString(code)
+    raise RuntimeError("%s failed with CUDA error %d: %s"
+                       % (what, code, message.decode("utf-8", "replace")
+                          if message else "unknown"))
+
+
+class _CudaBuffers:
+    """Contiguous host arrays mirrored into device memory for one kernel call."""
+
+    def __init__(self, arrays):
+        self.lib = _cuda_runtime()
+        self.entries = []
+        for arr in arrays:
+            ptr = ctypes.c_void_p()
+            nbytes = int(arr.nbytes)
+            _cuda_check(self.lib.cudaMalloc(ctypes.byref(ptr),
+                                            ctypes.c_size_t(max(1, nbytes))),
+                        "cudaMalloc")
+            if nbytes:
+                _cuda_check(self.lib.cudaMemcpy(
+                    ptr, ctypes.c_void_p(arr.ctypes.data),
+                    ctypes.c_size_t(nbytes), _CUDA_HOST_TO_DEVICE),
+                    "cudaMemcpy(host->device)")
+            self.entries.append((arr, ptr, nbytes))
+
+    def arg(self, index: int):
+        arr, ptr, _ = self.entries[index]
+        ctype = ctypes.c_longlong if arr.dtype == np.int64 else ctypes.c_double
+        return ctypes.cast(ptr, ctypes.POINTER(ctype))
+
+    def copy_back(self, index: int) -> None:
+        arr, ptr, nbytes = self.entries[index]
+        if not nbytes:
+            return
+        _cuda_check(self.lib.cudaMemcpy(
+            ctypes.c_void_p(arr.ctypes.data), ptr,
+            ctypes.c_size_t(nbytes), _CUDA_DEVICE_TO_HOST),
+            "cudaMemcpy(device->host)")
+
+    def synchronize(self) -> None:
+        _cuda_check(self.lib.cudaDeviceSynchronize(), "cudaDeviceSynchronize")
+
+    def free(self) -> None:
+        for _arr, ptr, _nbytes in self.entries:
+            self.lib.cudaFree(ptr)
+        self.entries = []
+
+
+def _invoke(fn, arrays, output_indices, scalars, backend: str) -> None:
+    """Call a generated launcher with host buffers or mirrored CUDA buffers."""
+    if backend != "cuda":
+        args = []
+        for arr in arrays:
+            ctype = ctypes.c_longlong if arr.dtype == np.int64 else ctypes.c_double
+            args.append(arr.ctypes.data_as(ctypes.POINTER(ctype)))
+        fn(*(args + list(scalars)))
+        return
+
+    buffers = _CudaBuffers(arrays)
+    try:
+        args = [buffers.arg(i) for i in range(len(arrays))]
+        fn(*(args + list(scalars)))
+        buffers.synchronize()
+        for index in output_indices:
+            buffers.copy_back(index)
+    finally:
+        buffers.free()
+
 # Arguments (beyond the ctypes pointer types) per kernel ABI.
 _SIGNATURES = {
     "spmv": [I64P, I64P, F64P, F64P, F64P, I64, I64, I64],
@@ -293,8 +411,14 @@ def _max_row_nnz(A: sp.csr_matrix) -> int:
     return int(counts.max()) if counts.size else 0
 
 
-def run_kernel(lib_path: str, kernel_name: str, A: sp.csr_matrix, data, K: int = 8):
-    """Load ``lib_path`` and invoke ``launch_<kernel_name>`` via ctypes."""
+def run_kernel(lib_path: str, kernel_name: str, A: sp.csr_matrix, data,
+               K: int = 8, backend: str = "cpu"):
+    """Load ``lib_path`` and invoke ``launch_<kernel_name>`` via ctypes.
+
+    For CUDA, NumPy buffers are copied into device memory before the launch and
+    the output is copied back afterwards; generated kernels never receive host
+    pointers.
+    """
     M, N = A.shape
     nnz = int(A.nnz)
     lib = ctypes.CDLL(lib_path)
@@ -305,24 +429,23 @@ def run_kernel(lib_path: str, kernel_name: str, A: sp.csr_matrix, data, K: int =
     ind = A.indices.astype(np.int64)
     dat = A.data.astype(np.float64)
     x, w, B, U, V, alpha, beta = data
-    p = lambda arr: arr.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-    pi = lambda arr: arr.ctypes.data_as(ctypes.POINTER(ctypes.c_longlong))
 
     if kernel_name == "spmv":
         out = np.zeros(M, dtype=np.float64)
-        fn(pi(ip), pi(ind), p(dat), p(x), p(out), M, N, nnz)
+        _invoke(fn, [ip, ind, dat, x, out], [4], (M, N, nnz), backend)
     elif kernel_name == "spmm":
         out = np.zeros((M, K), dtype=np.float64)
-        fn(pi(ip), pi(ind), p(dat), p(B), p(out), M, N, K, nnz)
+        _invoke(fn, [ip, ind, dat, B, out], [4], (M, N, K, nnz), backend)
     elif kernel_name == "sddmm":
         out = np.zeros(nnz, dtype=np.float64)
-        fn(pi(ip), pi(ind), p(dat), p(U), p(V), p(out), M, N, K, nnz)
+        _invoke(fn, [ip, ind, dat, U, V, out], [5], (M, N, K, nnz), backend)
     elif kernel_name == "fused_spmv_axpy":
         out = np.zeros(M, dtype=np.float64)
-        fn(pi(ip), pi(ind), p(dat), p(x), p(w), p(out), alpha, beta, M, N, nnz)
+        _invoke(fn, [ip, ind, dat, x, w, out], [5],
+                (alpha, beta, M, N, nnz), backend)
     elif kernel_name == "axpy":
         out = np.zeros(M, dtype=np.float64)
-        fn(p(x), p(w), p(out), alpha, beta, M)
+        _invoke(fn, [x, w, out], [2], (alpha, beta, M), backend)
     else:
         raise ValueError("unknown kernel %r" % kernel_name)
     return out, lib, fn, (ip, ind, dat)
@@ -373,7 +496,8 @@ def verify(
                             inject_bug=config.inject_bug,
                             message=log, config=config.to_dict())
 
-    out, _lib, _fn, _bufs = run_kernel(lib_path, kernel_name, A, data, K)
+    out, _lib, _fn, _bufs = run_kernel(lib_path, kernel_name, A, data, K,
+                                       backend=backend)
     out = np.asarray(out, dtype=np.float64).ravel()
     refv = np.asarray(ref, dtype=np.float64).ravel()
     diff = np.abs(out - refv)
