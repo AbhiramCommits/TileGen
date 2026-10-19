@@ -54,7 +54,12 @@ def _nvcc_version() -> Optional[str]:
 
 def _gpu_info() -> Dict[str, object]:
     """Query nvidia-smi for the first GPU's name and compute capability."""
-    info: Dict[str, object] = {"has_gpu": False, "gpu_name": None, "sm_arch": None}
+    info: Dict[str, object] = {
+        "has_gpu": False,
+        "gpu_name": None,
+        "compute_capability": None,
+        "sm_arch": None,
+    }
     exe = shutil.which("nvidia-smi")
     if exe is None:
         return info
@@ -70,6 +75,7 @@ def _gpu_info() -> Dict[str, object]:
         sm = cap.replace(".", "")
         info["has_gpu"] = True
         info["gpu_name"] = parts[0]
+        info["compute_capability"] = cap
         info["sm_arch"] = "sm_%s" % sm
     elif parts and parts[0]:
         info["has_gpu"] = True
@@ -120,6 +126,7 @@ def probe() -> Dict[str, object]:
         "nvcc_version": None,
         "has_gpu": False,
         "gpu_name": None,
+        "compute_capability": None,
         "sm_arch": None,
         "cpu_name": "unknown",
         "num_cores": 1,
@@ -172,6 +179,7 @@ def pretty(info: Optional[Dict[str, object]] = None) -> str:
         "nvcc_version : %s" % info.get("nvcc_version"),
         "has_gpu      : %s" % info.get("has_gpu"),
         "gpu_name     : %s" % info.get("gpu_name"),
+        "compute_cap  : %s" % info.get("compute_capability"),
         "sm_arch      : %s" % info.get("sm_arch"),
     ]
     return "\n".join(lines)

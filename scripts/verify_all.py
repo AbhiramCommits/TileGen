@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tilegen.codegen import Config  # noqa: E402
 from tilegen.env import probe  # noqa: E402
 from tilegen.matrices import build_corpus, corpus_classes  # noqa: E402
-from tilegen.verify import verify  # noqa: E402
+from tilegen.verify import cuda_arch, verify  # noqa: E402
 
 MATRIX_DIR = "data/matrices"
 RESULTS_DIR = "results"
@@ -34,6 +34,11 @@ def main() -> int:
     env = probe()
     backend = env["backend"]
     print("backend: %s (numeric reference runs on the CPU in float64)" % backend)
+    print("gpu: %s (compute %s, target %s); nvcc: %s"
+          % (env.get("gpu_name") or "none detected",
+             env.get("compute_capability") or "n/a",
+             cuda_arch() or "n/a",
+             env.get("nvcc_version") or "not present"))
 
     # ensure the corpus exists
     missing = [c for c in corpus_classes()

@@ -61,3 +61,29 @@ def test_cuda_text_check_and_markers(tmp_path):
     assert markers["__global__"]
     assert markers["__shfl_down_sync"]
     assert markers["#pragma unroll"]
+
+
+def test_cuda_launch_grid_covers_every_row():
+    from tilegen.dsl import standard_kernels
+    cfg = Config(tile_size=32, threads_per_row=4, unroll=4, block_size=256)
+    spmv = passes.run_pipeline(standard_kernels()["spmv"], cfg, backend="cuda")
+    src = emit_cuda(spmv, cfg)
+    # Every block covers TILE rows, not blockDim rows.
+    assert "int64_t blocks = (M + 32 - 1) / 32;" in src
+
+    cfg1 = Config(tile_size=1, threads_per_row=4, unroll=1, block_size=128)
+    sddmm = passes.run_pipeline(standard_kernels()["sddmm"], cfg1, backend="cuda")
+    src1 = emit_cuda(sddmm, cfg1)
+    # sddmm is always block-per-row, even when tiling is disabled.
+    assert "int64_t blocks = M;  // block-per-row mapping" in src1
+
+
+def test_cuda_unroll_pragma_precedes_the_loop():
+    from tilegen.dsl import standard_kernels
+    cfg = Config(tile_size=32, threads_per_row=1, unroll=4, block_size=256)
+    spmv = passes.run_pipeline(standard_kernels()["spmv"], cfg, backend="cuda")
+    src = emit_cuda(spmv, cfg)
+    lines = src.splitlines()
+    idx = lines.index("      #pragma unroll")
+    assert "for (; q + 4 <= pend; q += 4)" in lines[idx + 1]
+    assert "int64_t q = p;" in lines[idx - 1]

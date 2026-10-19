@@ -301,9 +301,9 @@ def _emit_compressed_loop(lines, ind, plan, env, unroll, body, marker=None):
             env["bind"][plan.col_idx.name] = "indices[%s]" % pe
 
     if unroll and unroll > 1:
+        lines.append("%sint64_t q = p;" % pad)
         if marker:
             lines.append("%s%s" % (pad, marker))
-        lines.append("%sint64_t q = p;" % pad)
         lines.append("%sfor (; q + %d <= pend; q += %d) {" % (pad, unroll, unroll))
         for o in range(unroll):
             set_p("q + %d" % o if o else "q")
@@ -706,11 +706,19 @@ def _launch_wrapper(kernel: Kernel, config: Config, sig: str, plan: Plan,
     if has_sparse:
         call_args.append("nnz")
     threads = min(config.block_size, 1024)
+    tile = config.tile_size if config.tile_size > 0 else 1
+    rows = plan.row_extent
     lines = ["  int64_t threads = %d;" % threads]
-    if plan.kind in ("row_dense_out", "sparse_out") and config.tile_size > 1:
-        lines.append("  int64_t blocks = M;  // block-per-row mapping")
+    if plan.kind == "sparse_out":
+        # The sddmm kernel always maps one block to one CSR row.
+        lines.append("  int64_t blocks = %s;  // block-per-row mapping" % rows)
+    elif plan.kind == "row_dense_out" and config.tile_size > 1:
+        lines.append("  int64_t blocks = %s;  // block-per-row mapping" % rows)
+    elif plan.kind == "scalar_reduce":
+        # Each block processes TILE rows, so size the grid by TILE, not by blockDim.
+        lines.append("  int64_t blocks = (%s + %d - 1) / %d;" % (rows, tile, tile))
     else:
-        lines.append("  int64_t blocks = (M + threads - 1) / threads;")
+        lines.append("  int64_t blocks = (%s + threads - 1) / threads;" % rows)
     extra = ""
     if plan.kind == "sparse_out":
         extra = ", (size_t)threads * sizeof(%s)" % ctype(config.dtype)

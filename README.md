@@ -126,7 +126,9 @@ To exercise the **real CUDA path** on a GPU machine: ensure `nvcc` is on `PATH` 
 `nvidia-smi` reports a device, then run `make all`. `tilegen.env.probe()` selects the `cuda`
 backend, the harness compiles `.cu` files with `nvcc -O3 -arch=sm_<detected>`, and timing uses
 `cudaEvent`; the emitted sources already contain the `__global__`, `#pragma unroll` and
-`__shfl_down_sync` markers regardless of whether a GPU is present.
+`__shfl_down_sync` markers regardless of whether a GPU is present. On such a machine
+`pytest` also runs `tests/test_cuda_gpu.py`, which compiles and executes every standard
+kernel across a range of schedules; without a GPU those cases skip cleanly.
 
 ## 4. Matrix corpus
 
@@ -148,7 +150,8 @@ Generated deterministically with seed 1234 (`data/matrices/manifest.json`):
 ```json
 {
   "has_nvcc": false, "nvcc_version": null,
-  "has_gpu": false, "gpu_name": null, "sm_arch": null,
+  "has_gpu": false, "gpu_name": null,
+  "compute_capability": null, "sm_arch": null,
   "cpu_name": "Apple M3", "num_cores": 8,
   "backend": "cpu"
 }

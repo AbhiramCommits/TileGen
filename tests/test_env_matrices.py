@@ -24,6 +24,7 @@ def test_probe_keys():
         "nvcc_version",
         "has_gpu",
         "gpu_name",
+        "compute_capability",
         "sm_arch",
         "cpu_name",
         "num_cores",

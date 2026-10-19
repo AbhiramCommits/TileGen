@@ -31,6 +31,7 @@ from .dsl import standard_kernels
 __all__ = [
     "VerifyResult",
     "compile_generated",
+    "cuda_arch",
     "verify",
     "syntax_check_cuda_text",
     "check_cuda_markers",
@@ -128,6 +129,20 @@ def _omp_flags() -> List[str]:
     return plain
 
 
+def cuda_arch() -> Optional[str]:
+    """Detected nvcc target, e.g. ``sm_75``; ``TILEGEN_CUDA_ARCH`` overrides it."""
+    override = os.environ.get("TILEGEN_CUDA_ARCH")
+    if override:
+        override = override.strip()
+        return override if override.startswith("sm_") else "sm_" + override
+    try:
+        from .env import probe
+
+        return probe().get("sm_arch")
+    except Exception:
+        return None
+
+
 def compile_generated(
     gen: "_codegen.GeneratedKernel",
     backend: str = "cpu",
@@ -152,11 +167,15 @@ def compile_generated(
                    + "\n  ".join(notes))
             return None, log
         out = os.path.join(workdir, gen.filename.rsplit(".", 1)[0] + "." + _SOEXT)
-        cmd = [nvcc, "-O3", "-shared", "-Xcompiler", "-fPIC", "-o", out, src]
+        cmd = [nvcc, "-O3"]
+        arch = cuda_arch()
+        if arch:
+            cmd.append("-arch=%s" % arch)
+        cmd += ["-std=c++17", "-shared", "-Xcompiler", "-fPIC", "-o", out, src]
         res = subprocess.run(cmd, capture_output=True, text=True)
         if res.returncode != 0:
             raise RuntimeError("nvcc failed for %s:\n%s" % (gen.filename, res.stderr))
-        return out, "nvcc compiled %s" % out
+        return out, "nvcc compiled %s with: %s" % (out, " ".join(cmd[1:]))
 
     # CPU backend
     out = os.path.join(workdir, gen.filename.rsplit(".", 1)[0] + "." + _SOEXT)
