@@ -12,8 +12,10 @@ The generator understands the structures the standard kernels need:
 * elementwise dense kernels (axpy)
 
 and emits explicit unrolled bodies with remainder tails, optional shared-memory
-tiles (CUDA, when tiling is on) and warp-level ``__shfl_down_sync`` segmented
-reductions (CUDA, when ``threads_per_row > 1``).
+tiles (CUDA, when the schedule contains a ``Tile``) and warp-level
+``__shfl_down_sync`` segmented reductions (CUDA, when it contains
+``ThreadsPerRow(k > 1)``).  All loop/launch choices come from the lowered
+schedule IR, not from :class:`Config`.
 
 ``inject_bug=True`` deliberately generates an off-by-one row bound so the
 differential tester can prove it detects wrong kernels.
@@ -27,9 +29,23 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from . import passes as _passes
-from .ir import Access, Add, Const, Expr, Index, Kernel, Mul, Reduce
+from .ir import (
+    Access,
+    Add,
+    Const,
+    Expr,
+    Index,
+    Kernel,
+    Mul,
+    Parallelize,
+    Reduce,
+    ThreadsPerRow,
+    Tile,
+    Unroll,
+    Vectorize,
+)
 
-__all__ = ["Config", "GeneratedKernel", "generate", "emit_cuda", "emit_cpu"]
+__all__ = ["Config", "GeneratedKernel", "Lowering", "generate", "emit_cuda", "emit_cpu"]
 
 
 _DTYPE = {"f64": "double", "f32": "float", "double": "double", "float": "float"}
@@ -69,6 +85,53 @@ class Config:
             self.vector_width, self.block_size, self.dtype, int(self.inject_bug),
         )
         return hashlib.sha1(key.encode()).hexdigest()[:10]
+
+
+@dataclass
+class Lowering:
+    """The loop/launch decisions the code generator actually consumes.
+
+    Every optimization pass lowers its decision into ``kernel.schedule``; this
+    view is the only place code generation reads tiling, thread mapping,
+    unrolling or vectorization from.  ``Config`` is just the input to the
+    passes, so disabling a pass and re-emitting really does produce different
+    code.
+    """
+
+    tile: int = 1
+    threads_per_row: int = 1
+    unroll: int = 1
+    vector_width: int = 1
+    block_size: int = 256
+    parallel: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "tile": self.tile,
+            "threads_per_row": self.threads_per_row,
+            "unroll": self.unroll,
+            "vector_width": self.vector_width,
+            "block_size": self.block_size,
+            "parallel": self.parallel,
+        }
+
+
+def _lowering(kernel: Kernel) -> Lowering:
+    low = Lowering()
+    for t in kernel.schedule:
+        if isinstance(t, Tile):
+            low.tile = t.size
+        elif isinstance(t, ThreadsPerRow):
+            low.threads_per_row = t.k
+        elif isinstance(t, Unroll):
+            low.unroll = t.factor
+        elif isinstance(t, Vectorize):
+            low.vector_width = t.width
+        elif isinstance(t, Parallelize):
+            low.parallel = True
+            if t.block_size:
+                low.block_size = t.block_size
+    return low
 
 
 @dataclass
@@ -348,10 +411,11 @@ def _emit_dense_reduce_loop(lines, ind, extent, unroll, value_fn, marker=None):
 # --------------------------------------------------------------------------- #
 # CPU emitter
 # --------------------------------------------------------------------------- #
-def _cpu_emit(kernel: Kernel, config: Config, plan: Plan) -> str:
+def _cpu_emit(kernel: Kernel, config: Config, plan: Plan,
+              low: Lowering) -> str:
     dt = ctype(config.dtype)
-    tile = config.tile_size if config.tile_size > 1 else 1
-    unroll = config.unroll
+    tile = low.tile if low.tile > 1 else 1
+    unroll = low.unroll
     bug = config.inject_bug
     lines: List[str] = []
     ind = 0
@@ -362,7 +426,8 @@ def _cpu_emit(kernel: Kernel, config: Config, plan: Plan) -> str:
 
     def emit_row_loops(body_fn, extra_pragma: Optional[str] = None):
         nonlocal ind
-        lines.append("#pragma omp parallel for schedule(dynamic, 256)")
+        if low.parallel:
+            lines.append("#pragma omp parallel for schedule(dynamic, 256)")
         if extra_pragma:
             lines.append(extra_pragma)
         if tile > 1:
@@ -381,7 +446,8 @@ def _cpu_emit(kernel: Kernel, config: Config, plan: Plan) -> str:
 
     if plan.kind == "elementwise":
         i = plan.out.indices[0]
-        lines.append("#pragma omp parallel for schedule(dynamic, 256)")
+        if low.parallel:
+            lines.append("#pragma omp parallel for schedule(dynamic, 256)")
         lines.append("for (int64_t i = 0; i < %s; ++i) {" % row_bound)
         env = {"bind": {i.name: "i"}, "p": None, "data": "data", "acc": None}
         lines.append("  %s[%s] = %s;" % (plan.out_tensor.name,
@@ -419,7 +485,7 @@ def _cpu_emit(kernel: Kernel, config: Config, plan: Plan) -> str:
         ext = _extent_for(plan, inner.name)
 
         def pbody(lines_, ind_, env):
-            if config.vector_width > 1:
+            if low.vector_width > 1:
                 lines_.append("%s#pragma omp simd" % ("  " * ind_))
             if unroll > 1:
                 lines_.append("%sint64_t ku = 0;" % ("  " * ind_))
@@ -494,11 +560,12 @@ def _extent_for(plan: Plan, index_name: str) -> str:
 # --------------------------------------------------------------------------- #
 # CUDA emitter
 # --------------------------------------------------------------------------- #
-def _cuda_emit(kernel: Kernel, config: Config, plan: Plan, decls: List[str]) -> str:
+def _cuda_emit(kernel: Kernel, config: Config, plan: Plan, decls: List[str],
+               low: Lowering) -> str:
     dt = ctype(config.dtype)
-    tile = config.tile_size
-    unroll = config.unroll
-    tpr = config.threads_per_row
+    tile = low.tile
+    unroll = low.unroll
+    tpr = low.threads_per_row
     bug = config.inject_bug
     lines: List[str] = []
 
@@ -652,12 +719,14 @@ def _cuda_emit(kernel: Kernel, config: Config, plan: Plan, decls: List[str]) -> 
 # --------------------------------------------------------------------------- #
 # File assembly
 # --------------------------------------------------------------------------- #
-def _header_comment(kernel: Kernel, config: Config, backend: str) -> str:
+def _header_comment(kernel: Kernel, config: Config, backend: str,
+                    low: Lowering) -> str:
     lines = [
         "// TileGen generated kernel -- DO NOT EDIT BY HAND.",
         "// kernel      : %s" % kernel.name,
         "// backend     : %s" % backend,
         "// config      : %s" % config.to_dict(),
+        "// lowering    : %s" % low.to_dict(),
         "// schedule    : %s" % ", ".join(
             _fmt_transform(t) for t in kernel.schedule) if kernel.schedule else "// schedule    : (default)",
         "// pass log    :",
@@ -677,6 +746,9 @@ def _fmt_transform(t) -> str:
     if isinstance(t, Split):
         return "Split(%s,%d)" % (t.index.name, t.factor)
     if isinstance(t, Parallelize):
+        if t.block_size:
+            return "Parallelize(%s,%s,B%d)" % (
+                t.index.name, t.unit, t.block_size)
         return "Parallelize(%s,%s)" % (t.index.name, t.unit)
     if isinstance(t, Unroll):
         return "Unroll(%s,%d)" % (t.index.name, t.factor)
@@ -689,8 +761,8 @@ def _fmt_transform(t) -> str:
     return t.kind
 
 
-def _launch_wrapper(kernel: Kernel, config: Config, sig: str, plan: Plan,
-                    arg_names: Dict[str, Any]) -> str:
+def _launch_wrapper(kernel: Kernel, config: Config, low: Lowering, sig: str,
+                    plan: Plan, arg_names: Dict[str, Any]) -> str:
     kname = "%s_kernel" % kernel.name
     call_args = []
     for kind, t in arg_names["arrays"]:
@@ -705,14 +777,14 @@ def _launch_wrapper(kernel: Kernel, config: Config, sig: str, plan: Plan,
     has_sparse = any(k == "sparse" for k, _ in arg_names["arrays"])
     if has_sparse:
         call_args.append("nnz")
-    threads = min(config.block_size, 1024)
-    tile = config.tile_size if config.tile_size > 0 else 1
+    threads = min(low.block_size, 1024)
+    tile = low.tile if low.tile > 0 else 1
     rows = plan.row_extent
     lines = ["  int64_t threads = %d;" % threads]
     if plan.kind == "sparse_out":
         # The sddmm kernel always maps one block to one CSR row.
         lines.append("  int64_t blocks = %s;  // block-per-row mapping" % rows)
-    elif plan.kind == "row_dense_out" and config.tile_size > 1:
+    elif plan.kind == "row_dense_out" and low.tile > 1:
         lines.append("  int64_t blocks = %s;  // block-per-row mapping" % rows)
     elif plan.kind == "scalar_reduce":
         # Each block processes TILE rows, so size the grid by TILE, not by blockDim.
@@ -728,8 +800,8 @@ def _launch_wrapper(kernel: Kernel, config: Config, sig: str, plan: Plan,
 
 
 def _assemble(kernel: Kernel, config: Config, backend: str, body: str, sig: str,
-              plan: Plan, arg_names: Dict[str, Any]) -> str:
-    header = _header_comment(kernel, config, backend)
+              plan: Plan, arg_names: Dict[str, Any], low: Lowering) -> str:
+    header = _header_comment(kernel, config, backend, low)
     if backend == "cuda":
         pieces = [
             header,
@@ -741,7 +813,7 @@ def _assemble(kernel: Kernel, config: Config, backend: str, body: str, sig: str,
             "",
             'extern "C" %s {' % sig,
         ]
-        wrapper = _launch_wrapper(kernel, config, sig, plan, arg_names)
+        wrapper = _launch_wrapper(kernel, config, low, sig, plan, arg_names)
         pieces += wrapper.splitlines()
         pieces.append("}")
         pieces.append("")
@@ -765,16 +837,18 @@ def _assemble(kernel: Kernel, config: Config, backend: str, body: str, sig: str,
 # --------------------------------------------------------------------------- #
 def emit_cpu(kernel: Kernel, config: Config) -> str:
     plan = _plan(kernel)
+    low = _lowering(kernel)
     sig, arg_names, _ = _abi(kernel)
-    body = _cpu_emit(kernel, config, plan)
-    return _assemble(kernel, config, "cpu", body, sig, plan, arg_names)
+    body = _cpu_emit(kernel, config, plan, low)
+    return _assemble(kernel, config, "cpu", body, sig, plan, arg_names, low)
 
 
 def emit_cuda(kernel: Kernel, config: Config) -> str:
     plan = _plan(kernel)
+    low = _lowering(kernel)
     sig, arg_names, _ = _abi(kernel)
-    body = _cuda_emit(kernel, config, plan, arg_names["decls"])
-    return _assemble(kernel, config, "cuda", body, sig, plan, arg_names)
+    body = _cuda_emit(kernel, config, plan, arg_names["decls"], low)
+    return _assemble(kernel, config, "cuda", body, sig, plan, arg_names, low)
 
 
 def generate(
@@ -795,7 +869,12 @@ def generate(
         source = emit_cpu(optimized, config)
         ext = "cpp"
     sig, _, _ = _abi(optimized)
-    filename = "%s_%s.%s" % (optimized.name, config.hash(), ext)
+    # Include a digest of the emitted source so two pass configurations with
+    # the same Config but different lowerings never share a file or a cached
+    # shared object.  (The old config-only name made ablation variants collide.)
+    source_digest = hashlib.sha1(source.encode()).hexdigest()[:8]
+    filename = "%s_%s_%s.%s" % (
+        optimized.name, config.hash(), source_digest, ext)
     gen = GeneratedKernel(
         source=source,
         filename=filename,

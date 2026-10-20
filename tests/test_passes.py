@@ -71,6 +71,49 @@ def test_unroll_changes_emitted_source():
     assert unrolled != base
 
 
+def _code_body(source: str) -> str:
+    """Emitted code with the diagnostic header comments removed."""
+    return "\n".join(line for line in source.splitlines()
+                     if not line.lstrip().startswith("//"))
+
+
+def test_skipping_tiling_changes_cuda_and_cpu_code():
+    k = standard_kernels()["spmv"]
+    cfg = Config(tile_size=64, threads_per_row=4, unroll=4, block_size=256)
+    full_cuda = emit_cuda(passes.run_pipeline(k, cfg, backend="cuda"), cfg)
+    ablated_cuda = emit_cuda(
+        passes.run_pipeline(k, cfg, backend="cuda", skip=("tiling",)), cfg)
+    assert _code_body(full_cuda) != _code_body(ablated_cuda)
+
+    full_cpu = emit_cpu(passes.run_pipeline(k, cfg), cfg)
+    ablated_cpu = emit_cpu(
+        passes.run_pipeline(k, cfg, skip=("tiling",)), cfg)
+    assert _code_body(full_cpu) != _code_body(ablated_cpu)
+
+
+def test_skipping_thread_mapping_changes_cuda_code():
+    k = standard_kernels()["spmv"]
+    cfg = Config(tile_size=32, threads_per_row=4, unroll=1, block_size=128)
+    full = emit_cuda(passes.run_pipeline(k, cfg, backend="cuda"), cfg)
+    ablated = emit_cuda(
+        passes.run_pipeline(k, cfg, backend="cuda", skip=("thread_mapping",)),
+        cfg)
+    assert "__shfl_down_sync" in full
+    assert "__shfl_down_sync" not in ablated
+    assert _code_body(full) != _code_body(ablated)
+
+
+def test_noop_passes_emit_identical_code():
+    k = standard_kernels()["spmv"]
+    cfg = Config(tile_size=32, threads_per_row=1, unroll=1, block_size=256)
+    full = _code_body(emit_cuda(
+        passes.run_pipeline(k, cfg, backend="cuda"), cfg))
+    for name in ("canonicalize", "loop_fusion", "vectorize", "dead_code_elim"):
+        ablated = _code_body(emit_cuda(
+            passes.run_pipeline(k, cfg, backend="cuda", skip=(name,)), cfg))
+        assert ablated == full, name
+
+
 def test_cuda_markers():
     k = standard_kernels()["spmv"]
     cfg = Config(tile_size=32, threads_per_row=4, unroll=4, block_size=256)

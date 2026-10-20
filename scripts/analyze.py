@@ -257,31 +257,24 @@ def main() -> int:
 
     ablation_md = os.path.join(RESULTS, "pass_ablation.md")
     if os.path.exists(ablation_md):
-        out.append("## Pass ablation (CUDA)")
+        out.append("## Pass ablation")
         out.append("")
         out.append("Contribution is `disabled_ms / full_ms`; values above 1 "
-                   "mean the pass was helping. The full per-pass data is in "
+                   "mean the pass was helping. Cases whose emitted code is "
+                   "byte-identical are marked `no change` and are not timed. "
+                   "The full per-pass data, including code-diff hashes, is in "
                    "`results/pass_ablation.json`.")
         out.append("")
         with open(ablation_md) as fh:
             text = fh.read().splitlines()
-        try:
-            start = text.index("## spmv")
-        except ValueError:
-            start = 0
-        out.extend(text[start:])
-        out.append("")
-        out.append("Only `loop_fusion` changes the generated computation for a "
-                   "standard kernel: disabling it on `fused_spmv_axpy` writes "
-                   "temporary `t` instead of `z`, so that ablation is invalid "
-                   "rather than merely slower. The other passes have no "
-                   "repeatable effect; individual class outliers of ~0.8x or "
-                   "~1.2x are benchmark noise because the emitted kernel bodies "
-                   "are unchanged.")
+        # Drop the file's own top-level heading; REPORT.md supplies one.
+        if text and text[0].startswith("# "):
+            text = text[1:]
+        out.extend(text)
         out.append("")
 
     with open(os.path.join(RESULTS, "REPORT.md"), "w") as fh:
-        fh.write("\n".join(out))
+        fh.write("\n".join(out).rstrip() + "\n")
 
     # ---- correctness_summary.md ----
     cpath = os.path.join(RESULTS, "correctness.json")

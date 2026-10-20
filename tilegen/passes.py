@@ -4,7 +4,9 @@ Every pass has the signature ``pass(kernel) -> kernel`` and appends one entry to
 ``kernel.pass_log`` describing what it did (pass name, action, and before/after
 snippets).  ``run_pipeline`` / ``optimize`` deep-copies the input kernel, sets the
 transient ``_config`` / ``_backend`` attributes, and then applies ``PASSES`` in
-order.  Running the pipeline twice on a canonical kernel is a no-op.
+order.  Lowering passes write typed transforms into ``kernel.schedule``; code
+generation consumes those transforms rather than the original ``Config``.
+Running the pipeline twice on a canonical kernel is a no-op.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from .ir import (
     Index,
     Kernel,
     Mul,
+    Parallelize,
     Reduce,
     Schedule,
     Stmt,
@@ -90,6 +93,26 @@ def _writes(stmt: Stmt) -> str:
 
 def _reads(expr: Expr) -> List[str]:
     return [n.tensor.name for n in expr.walk() if isinstance(n, Access)]
+
+
+def _upsert(kernel: Kernel, cls, matches, new) -> None:
+    """Replace the first matching transform in place, or append ``new``.
+
+    Transforming in place keeps the schedule order stable, which makes a
+    second pipeline run an actual no-op (rather than reordering the schedule).
+    """
+    for i, t in enumerate(kernel.schedule.transforms):
+        if isinstance(t, cls) and matches(t):
+            kernel.schedule.transforms[i] = new
+            return
+    kernel.schedule.append(new)
+
+
+def _drop(kernel: Kernel, cls, matches=lambda t: True) -> None:
+    kernel.schedule.transforms = [
+        t for t in kernel.schedule.transforms
+        if not (isinstance(t, cls) and matches(t))
+    ]
 
 
 # --------------------------------------------------------------------------- #
@@ -233,12 +256,14 @@ def tiling(kernel: Kernel) -> Kernel:
         return kernel
     outer = free[0]
     if tile <= 1:
+        _drop(kernel, Tile, lambda t: t.index.name == outer.name)
         _log(kernel, "tiling", "tile_size <= 1; no tiling applied")
         return kernel
-    # Record the transform on the schedule.
-    if not any(isinstance(t, Tile) and t.index.name == outer.name
-               for t in kernel.schedule):
-        kernel.schedule.append(Tile(outer, tile))
+    # Lower the logical index into an outer tile loop plus an inner stripped
+    # loop.  Code generation reads this transform; it does not consult
+    # ``Config`` for the tile size.
+    _upsert(kernel, Tile, lambda t: t.index.name == outer.name,
+            Tile(outer, tile))
     _log(
         kernel,
         "tiling",
@@ -259,11 +284,16 @@ def thread_mapping(kernel: Kernel) -> Kernel:
     tpr = getattr(cfg, "threads_per_row", 1) or 1
     block = getattr(cfg, "block_size", 256) or 256
     free = kernel.free_indices()
-    outer = free[0].name if free else "?"
-    if tpr > 1 and not any(
-        isinstance(t, ThreadsPerRow) and t.k == tpr for t in kernel.schedule
-    ):
-        kernel.schedule.append(ThreadsPerRow(tpr))
+    outer_index = free[0] if free else Index("?")
+    outer = outer_index.name
+    # Record the thread mapping and launch geometry in the schedule.  These
+    # are the values code generation consumes; it never reads them from Config.
+    _upsert(kernel, Parallelize, lambda t: t.index.name == outer,
+            Parallelize(outer_index, "thread", block_size=block))
+    if tpr > 1:
+        _upsert(kernel, ThreadsPerRow, lambda t: True, ThreadsPerRow(tpr))
+    else:
+        _drop(kernel, ThreadsPerRow)
     if backend == "cuda":
         unit = "warp (segmented reduction via __shfl_down_sync)" if tpr > 1 else "thread"
         _log(
@@ -294,11 +324,13 @@ def unroll(kernel: Kernel) -> Kernel:
     factor = getattr(cfg, "unroll", 1) or 1
     red = kernel.reduce_node()
     if factor <= 1:
+        _drop(kernel, Unroll)
         _log(kernel, "unroll", "unroll factor <= 1; no unrolling")
         return kernel
-    target = red.index.name if red is not None else (kernel.free_indices() or [Index("?")])[0].name
-    if not any(isinstance(t, Unroll) and t.factor == factor for t in kernel.schedule):
-        kernel.schedule.append(Unroll(red.index if red is not None else kernel.free_indices()[0], factor))
+    target_index = (red.index if red is not None
+                    else (kernel.free_indices() or [Index("?")])[0])
+    target = target_index.name
+    _upsert(kernel, Unroll, lambda t: True, Unroll(target_index, factor))
     _log(
         kernel,
         "unroll",
@@ -328,10 +360,12 @@ def vectorize(kernel: Kernel) -> Kernel:
     cfg = _config_of(kernel)
     width = getattr(cfg, "vector_width", 1) or 1
     if width <= 1:
+        _drop(kernel, Vectorize)
         _log(kernel, "vectorize", "vector_width <= 1; skipped")
         return kernel
     access = _dense_unit_stride_access(kernel)
     if access is None:
+        _drop(kernel, Vectorize)
         _log(
             kernel,
             "vectorize",
@@ -341,14 +375,14 @@ def vectorize(kernel: Kernel) -> Kernel:
         return kernel
     last_dim = access.tensor.shape[-1]
     if isinstance(last_dim, int) and last_dim % width != 0:
+        _drop(kernel, Vectorize)
         _log(
             kernel,
             "vectorize",
             "skipped: extent %d not divisible by vector_width %d" % (last_dim, width),
         )
         return kernel
-    if not any(isinstance(t, Vectorize) and t.width == width for t in kernel.schedule):
-        kernel.schedule.append(Vectorize(width))
+    _upsert(kernel, Vectorize, lambda t: True, Vectorize(width))
     vtype = {2: "double2", 4: "double2x2/float4"}.get(width, "vec%d" % width)
     _log(
         kernel,

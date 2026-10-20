@@ -288,6 +288,11 @@ class Split(Transform):
 class Parallelize(Transform):
     index: Index = None  # type: ignore[assignment]
     unit: str = "thread"
+    #: Threads per block for the launch configuration.  Zero means "leave the
+    #: backend default in place"; ``thread_mapping`` records the chosen value
+    #: here so code generation consumes the lowered schedule rather than
+    #: reading :class:`~tilegen.codegen.Config` directly.
+    block_size: int = 0
     kind: ClassVar[str] = "parallelize"
 
 
@@ -504,8 +509,11 @@ class Kernel:
                 raise ValueError("ThreadsPerRow must be > 0 (got %d)" % t.k)
             if isinstance(t, Vectorize) and t.width <= 0:
                 raise ValueError("Vectorize width must be > 0 (got %d)" % t.width)
-            if isinstance(t, Parallelize) and t.unit not in ("block", "warp", "thread"):
-                raise ValueError("Parallelize unit must be block|warp|thread")
+            if isinstance(t, Parallelize):
+                if t.unit not in ("block", "warp", "thread"):
+                    raise ValueError("Parallelize unit must be block|warp|thread")
+                if t.block_size < 0:
+                    raise ValueError("Parallelize block_size must be >= 0")
 
         return True
 
@@ -514,7 +522,8 @@ class Kernel:
         """Render the IR as indented loop-nest pseudocode."""
         lines: List[str] = ["kernel %s {" % self.name]
         for st in self.stmts:
-            lines.append("  assign %s = %s" % (_fmt_access(st.lhs), _fmt_expr(st.rhs)))
+            lines.append("  assign %s = %s" % (
+                _fmt_access_pretty(st.lhs), _fmt_expr_pretty(st.rhs)))
         lines.append("  // loop nest")
         lines.append(_pretty_nest(self))
         if self.schedule.transforms:
@@ -572,6 +581,42 @@ def _fmt_expr(e: Expr) -> str:
     return repr(e)  # pragma: no cover
 
 
+def _fmt_access_pretty(a: Access) -> str:
+    if a.tensor.order == 0:
+        return a.tensor.name
+    return _fmt_access(a)
+
+
+def _fmt_expr_pretty(e: Expr, parent: int = 0) -> str:
+    """Render math with only the parentheses precedence requires."""
+    if isinstance(e, Access):
+        return _fmt_access_pretty(e)
+    if isinstance(e, Const):
+        return repr(e.value)
+    if isinstance(e, Reduce):
+        return "sum(%s, %s)" % (e.index.name, _fmt_expr_pretty(e.body))
+    if isinstance(e, Mul):
+        text = "%s * %s" % (_fmt_expr_pretty(e.left, 2),
+                            _fmt_expr_pretty(e.right, 2))
+        return "(%s)" % text if parent > 2 else text
+    if isinstance(e, Add):
+        text = "%s + %s" % (_fmt_expr_pretty(e.left, 1),
+                            _fmt_expr_pretty(e.right, 1))
+        return "(%s)" % text if parent > 1 else text
+    return repr(e)  # pragma: no cover
+
+
+def _strip_reduces(expr: Expr) -> Expr:
+    """Replace each ``Reduce`` node with its body (the loop's per-trip value)."""
+    if isinstance(expr, Reduce):
+        return _strip_reduces(expr.body)
+    if isinstance(expr, Mul):
+        return Mul(_strip_reduces(expr.left), _strip_reduces(expr.right))
+    if isinstance(expr, Add):
+        return Add(_strip_reduces(expr.left), _strip_reduces(expr.right))
+    return expr
+
+
 def _pretty_nest(kernel: Kernel) -> str:
     """A readable loop-nest rendering derived from the IR structure."""
     lines: List[str] = []
@@ -611,15 +656,22 @@ def _pretty_nest(kernel: Kernel) -> str:
         depth = 2
     for st in kernel.stmts:
         stmt_depth = depth
-        for red in _reductions(st.rhs):
+        reductions = _reductions(st.rhs)
+        for red in reductions:
             lines.append(
                 "%sfor %s in reduce(%s):"
                 % ("  " * stmt_depth, red.index.name, _src(red.index))
             )
             stmt_depth += 1
+        # Inside the reduction loop the statement is an accumulation over the
+        # loop variable; printing the original ``sum(j, ...)`` there repeats the
+        # reduction and reads as if it happened once per trip.
+        op = "+=" if reductions else "="
+        body = _strip_reduces(st.rhs) if reductions else st.rhs
         lines.append(
-            "%sassign %s = %s"
-            % ("  " * stmt_depth, _fmt_access(st.lhs), _fmt_expr(st.rhs))
+            "%sassign %s %s %s"
+            % ("  " * stmt_depth, _fmt_access_pretty(st.lhs), op,
+               _fmt_expr_pretty(body))
         )
     if not kernel.stmts:
         lines.append("  (empty)")
@@ -632,6 +684,9 @@ def _fmt_transform(t: Transform) -> str:
     if isinstance(t, Split):
         return "Split(%s, %d)" % (t.index.name, t.factor)
     if isinstance(t, Parallelize):
+        if t.block_size:
+            return "Parallelize(%s, %s, block=%d)" % (
+                t.index.name, t.unit, t.block_size)
         return "Parallelize(%s, %s)" % (t.index.name, t.unit)
     if isinstance(t, Unroll):
         return "Unroll(%s, %d)" % (t.index.name, t.factor)
@@ -734,7 +789,8 @@ def _transform_to_dict(t: Transform) -> Dict[str, Any]:
     elif isinstance(t, Split):
         base.update(index=_index_to_dict(t.index), factor=t.factor)
     elif isinstance(t, Parallelize):
-        base.update(index=_index_to_dict(t.index), unit=t.unit)
+        base.update(index=_index_to_dict(t.index), unit=t.unit,
+                    block_size=t.block_size)
     elif isinstance(t, Unroll):
         base.update(index=_index_to_dict(t.index), factor=t.factor)
     elif isinstance(t, Fuse):
@@ -753,7 +809,8 @@ def _transform_from_dict(d: Dict[str, Any]) -> Transform:
     if kind == "split":
         return Split(_index_from_dict(d["index"]), d["factor"])
     if kind == "parallelize":
-        return Parallelize(_index_from_dict(d["index"]), d["unit"])
+        return Parallelize(_index_from_dict(d["index"]), d["unit"],
+                           d.get("block_size", 0))
     if kind == "unroll":
         return Unroll(_index_from_dict(d["index"]), d["factor"])
     if kind == "fuse":

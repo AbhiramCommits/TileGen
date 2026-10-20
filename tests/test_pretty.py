@@ -9,20 +9,20 @@ from tilegen.dsl import standard_kernels
 
 SNAPSHOTS = {
     "spmv": """kernel spmv {
-  assign y[i] = sum(j, (A[i, j] * x[j]))
+  assign y[i] = sum(j, A[i, j] * x[j])
   // loop nest
   for i:
     for j in reduce(A row):
-      assign y[i] = sum(j, (A[i, j] * x[j]))
+      assign y[i] += A[i, j] * x[j]
 }""",
     "fused_spmv_axpy": """kernel fused_spmv_axpy {
-  assign t[i] = sum(j, (A[i, j] * x[j]))
-  assign z[i] = ((alpha[] * t[i]) + (beta[] * w[i]))
+  assign t[i] = sum(j, A[i, j] * x[j])
+  assign z[i] = alpha * t[i] + beta * w[i]
   // loop nest
   for i:
     for j in reduce(A row):
-      assign t[i] = sum(j, (A[i, j] * x[j]))
-    assign z[i] = ((alpha[] * t[i]) + (beta[] * w[i]))
+      assign t[i] += A[i, j] * x[j]
+    assign z[i] = alpha * t[i] + beta * w[i]
 }""",
 }
 
