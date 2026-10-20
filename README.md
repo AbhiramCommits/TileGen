@@ -135,16 +135,16 @@ Without a GPU, the CUDA tests skip cleanly.
 
 ## What I learned / what surprised me
 
-- TODO: I expected the pass list to be where the performance came from. The ablation showed
+- I expected the pass list to be where the performance came from. The ablation showed
   that only `loop_fusion` changes the generated computation; the rest are mostly metadata or
   no-ops on the standard kernels.
-- TODO: I was surprised that `loop_fusion` is a correctness pass, not a speed pass. Turn it off
+- I was surprised that `loop_fusion` is a correctness pass, not a speed pass. Turn it off
   for `fused_spmv_axpy` and the kernel writes `t` instead of `z`.
-- TODO: Autotuning, not pass toggling, did the real work on irregular rows: 4.45x over the
+- Autotuning, not pass toggling, did the real work on irregular rows: 4.45x over the
   fixed default on `dense_rows` and 2.78x on `power_law`.
-- TODO: I did not expect TileGen to beat cuSPARSE on `banded`, `uniform_random`,
+- I did not expect TileGen to beat cuSPARSE on `banded`, `uniform_random`,
   `diagonal_heavy`, and `blocked`, while losing on `power_law` and `dense_rows`.
-- TODO: The default one-thread-per-row schedule was especially bad on high-variance rows; that
+- The default one-thread-per-row schedule was especially bad on high-variance rows; that
   is the clearest argument for keeping the autotuner.
 
 ## License
