@@ -103,7 +103,27 @@ File map:
 | `tilegen/verify.py` | `compile_generated`, `verify`, CUDA text-level checks |
 | `tilegen/autotune.py` | search space, pruning, `tune`, output writers |
 | `cpp/` | reference kernels, host harness, Catch2 tests, optional CUDA |
-| `scripts/` | `probe_env`, `gen_demo`, `verify_all`, `autotune`, `analyze` |
+| `scripts/` | `probe_env`, `gen_demo`, `verify_all`, `autotune`, `analyze`, `compare_cusparse`, `ablate_passes` |
+
+### Pass implementation status
+
+Measured by disabling one pass at a time on a Tesla T4; see
+`results/pass_ablation.md` and `results/pass_ablation.json`.
+
+| pass | status |
+|---|---|
+| `loop_fusion` | **Active / measured impact.** Required for `fused_spmv_axpy`: disabling it leaves the kernel writing temporary `t` instead of `z`, so the ablated fused kernel is invalid. |
+| `canonicalize` | **Experimental / no measured impact.** The standard kernels are already canonical; disabling it gives ~1.0x. It can change non-canonical input, but no standard kernel exercises that. |
+| `tiling` | **Experimental / no measured impact as a pass.** It only appends schedule metadata; `codegen` reads `Config.tile_size` directly, so disabling the pass does not remove the tiled loop. |
+| `thread_mapping` | **Experimental / no measured impact as a pass.** It only records `ThreadsPerRow`; `codegen` reads `Config.threads_per_row` directly. |
+| `unroll` | **Experimental / no measured impact as a pass.** It only records `Unroll`; `codegen` reads `Config.unroll` directly. |
+| `vectorize` | **Experimental / no measured impact as a pass.** It only records `Vectorize`; `codegen` reads `Config.vector_width` directly (and the CUDA emitter does not emit vector loads). |
+| `dead_code_elim` | **Experimental / no measured impact.** The standard kernels have no dead statements; disabling it gives ~1.0x. It can remove unused statements from other kernels. |
+
+The broad conclusion is deliberately conservative: on the standard kernels, only
+`loop_fusion` changes the generated computation. The other passes either only
+annotate the schedule / pass log or remove nothing, so their measured
+contributions are within benchmark noise (~0.97-1.03x class means).
 
 ## 3. How to run
 

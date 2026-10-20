@@ -10,7 +10,7 @@ order.  Running the pipeline twice on a canonical kernel is a no-op.
 from __future__ import annotations
 
 import copy
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from .ir import (
     Access,
@@ -418,14 +418,17 @@ def run_pipeline(
     config: Any = None,
     backend: str = "cpu",
     fresh: bool = True,
+    skip: Sequence[str] = (),
 ) -> Kernel:
-    """Apply all passes in order, returning the transformed kernel."""
+    """Apply all passes in order, optionally skipping named passes."""
     k = copy.deepcopy(kernel) if fresh else kernel
     k._config = config
     k._backend = backend
     k.pass_log = []
+    skipped = set(skip)
     for p in PASSES:
-        p(k)
+        if p.__name__ not in skipped:
+            p(k)
     try:
         k.validate()
     except ValueError as exc:  # pragma: no cover - defensive

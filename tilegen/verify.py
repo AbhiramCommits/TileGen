@@ -19,7 +19,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import ctypes
 import numpy as np
@@ -459,6 +459,7 @@ def verify(
     workdir: str = "build/generated",
     K: int = 8,
     seed: int = 7,
+    skip_passes: Sequence[str] = (),
 ) -> VerifyResult:
     """Generate, compile and run ``kernel_name`` and compare against a reference.
 
@@ -478,7 +479,8 @@ def verify(
     ref = _reference(kernel_name, A, data)
 
     gen = _codegen.generate(kernels[kernel_name], config, backend,
-                            outdir=workdir, write=True)
+                            outdir=workdir, write=True,
+                            skip_passes=skip_passes)
     try:
         lib_path, log = compile_generated(gen, backend, workdir)
     except RuntimeError as exc:

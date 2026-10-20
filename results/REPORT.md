@@ -79,3 +79,33 @@ TileGen loses to cuSPARSE on **power_law (imbalance 247.4x), dense_rows (imbalan
 TileGen wins on **banded, uniform_random, diagonal_heavy, blocked**, which have shorter, more regular rows where a simple row-parallel kernel is competitive and cuSPARSE's more elaborate work distribution does not pay for itself.
 
 The fixed default is the naive T32/TPR1/U1/V1/B128 schedule. Autotuning buys only ~1.01-1.07x on banded and diagonal_heavy, but 2.0-4.45x on uniform_random, blocked, power_law and dense_rows: on those classes the default's one-thread-per-row mapping serializes long or irregular rows. The cuSPARSE columns put both TileGen schedules in absolute context.
+
+## Pass ablation (CUDA)
+
+Contribution is `disabled_ms / full_ms`; values above 1 mean the pass was helping. The full per-pass data is in `results/pass_ablation.json`.
+
+## spmv
+
+| pass | banded | uniform_random | power_law | diagonal_heavy | dense_rows | blocked | mean |
+|---|---|---|---|---|---|---|---|
+| `canonicalize` | 1.09x | 1.00x | 0.99x | 0.99x | 0.99x | 1.02x | 1.01x |
+| `loop_fusion` | 1.00x | 0.99x | 0.98x | 0.98x | 0.84x | 1.00x | 0.97x |
+| `tiling` | 0.99x | 1.00x | 1.01x | 1.02x | 0.99x | 1.18x | 1.03x |
+| `thread_mapping` | 0.99x | 0.99x | 1.01x | 1.03x | 0.99x | 1.02x | 1.01x |
+| `unroll` | 0.99x | 1.00x | 0.99x | 0.98x | 1.00x | 0.99x | 0.99x |
+| `vectorize` | 1.01x | 1.00x | 0.99x | 1.02x | 1.02x | 0.99x | 1.01x |
+| `dead_code_elim` | 1.00x | 1.00x | 1.01x | 1.00x | 1.01x | 1.00x | 1.00x |
+
+## fused_spmv_axpy
+
+| pass | banded | uniform_random | power_law | diagonal_heavy | dense_rows | blocked | mean |
+|---|---|---|---|---|---|---|---|
+| `canonicalize` | 0.99x | 1.00x | 1.01x | 1.02x | 1.03x | 0.99x | 1.01x |
+| `loop_fusion` | **INVALID** | **INVALID** | **INVALID** | **INVALID** | **INVALID** | **INVALID** | - |
+| `tiling` | 1.00x | 1.00x | 0.99x | 1.00x | 1.01x | 1.00x | 1.00x |
+| `thread_mapping` | 1.02x | 1.00x | 1.10x | 0.99x | 1.03x | 0.82x | 0.99x |
+| `unroll` | 1.01x | 1.02x | 0.99x | 1.02x | 1.01x | 1.00x | 1.01x |
+| `vectorize` | 1.02x | 1.01x | 0.95x | 0.96x | 1.01x | 1.01x | 0.99x |
+| `dead_code_elim` | 0.99x | 1.01x | 1.00x | 1.00x | 0.81x | 1.00x | 0.97x |
+
+Only `loop_fusion` changes the generated computation for a standard kernel: disabling it on `fused_spmv_axpy` writes temporary `t` instead of `z`, so that ablation is invalid rather than merely slower. The other passes have no repeatable effect; individual class outliers of ~0.8x or ~1.2x are benchmark noise because the emitted kernel bodies are unchanged.

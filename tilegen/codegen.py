@@ -24,7 +24,7 @@ from __future__ import annotations
 import hashlib
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from . import passes as _passes
 from .ir import Access, Add, Const, Expr, Index, Kernel, Mul, Reduce
@@ -783,9 +783,11 @@ def generate(
     backend: str = "cpu",
     outdir: Optional[str] = "build/generated",
     write: bool = True,
+    skip_passes: Sequence[str] = (),
 ) -> GeneratedKernel:
     """Optimize the kernel with the pass pipeline and emit source for ``backend``."""
-    optimized = _passes.run_pipeline(kernel, config, backend=backend)
+    optimized = _passes.run_pipeline(kernel, config, backend=backend,
+                                     skip=skip_passes)
     if backend == "cuda":
         source = emit_cuda(optimized, config)
         ext = "cu"
