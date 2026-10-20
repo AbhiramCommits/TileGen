@@ -206,11 +206,11 @@ Without a GPU, the CUDA tests skip cleanly.
   timing is the fix, and it also exposed that the code generator had been ignoring the schedule.
 - `loop_fusion` is a correctness pass, not a speed pass. Turn it off for `fused_spmv_axpy` and
   the kernel writes `t` instead of `z`.
-- TODO: Autotuning, not pass toggling, did the real work on irregular rows: 4.45x over the
+- Autotuning, not pass toggling, did the real work on irregular rows: 4.45x over the
   fixed default on `dense_rows` and 2.78x on `power_law`.
-- TODO: I did not expect TileGen to beat cuSPARSE on `banded`, `uniform_random`,
+- I did not expect TileGen to beat cuSPARSE on `banded`, `uniform_random`,
   `diagonal_heavy`, and `blocked`, while losing on `power_law` and `dense_rows`.
-- TODO: The default one-thread-per-row schedule was especially bad on high-variance rows; that
+- The default one-thread-per-row schedule was especially bad on high-variance rows; that
   is the clearest argument for keeping the autotuner.
 
 ## License
