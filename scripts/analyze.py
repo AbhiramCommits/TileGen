@@ -129,17 +129,29 @@ def main() -> int:
     results = auto["results"]
     manifest = _imbalance_map()
     env = auto.get("hardware", {})
+    cmp_path = os.path.join(RESULTS, "cusparse_comparison.json")
+    cmp_data = _load(cmp_path) if os.path.exists(cmp_path) else None
 
     # ---- REPORT.md ----
     out = []
     out.append("# TileGen autotuning report")
     out.append("")
-    out.append("Backend that produced these numbers: **%s**. CPU: %s (%s cores). "
+    out.append("All-kernel table source: **%s** backend. CPU: %s (%s cores). "
                "GPU: %s. nvcc: %s."
                % (env.get("backend"), env.get("cpu_name"), env.get("num_cores"),
                   env.get("gpu_name") or "none detected",
                   env.get("nvcc_version") or "not present"))
     out.append("")
+    if cmp_data is not None:
+        hw = cmp_data.get("hardware", {})
+        out.append("> The all-kernel table below is the earlier autotune run. "
+                   "The SpMV-on-CUDA autotune and cuSPARSE comparison were "
+                   "produced separately on a %s (compute %s, nvcc %s) and are "
+                   "reported at the end of this file."
+                   % (hw.get("gpu_name") or "CUDA GPU",
+                      hw.get("compute_capability") or "n/a",
+                      hw.get("nvcc_version") or "unknown"))
+        out.append("")
     out.append("Baseline (naive) config: %s. Search space: %s."
                % (_fmt_cfg(auto.get("baseline")), auto.get("search_space")))
     out.append("")
@@ -175,6 +187,73 @@ def main() -> int:
                "results/autotune.json is the compact summary." %
                len(auto.get("pruned", [])))
     out.append("")
+
+    if cmp_data is not None:
+        cmp = cmp_data
+        rows = cmp.get("classes", [])
+        hw = cmp.get("hardware", {})
+        out.append("## SpMV on CUDA vs cuSPARSE")
+        out.append("")
+        out.append("Autotuned on a **%s** (compute %s, nvcc %s). All timings "
+                   "use CUDA events: %d warmup iterations and the median of %d "
+                   "timed runs, with host/device transfers excluded. The fixed "
+                   "default is %s."
+                   % (hw.get("gpu_name") or "CUDA GPU",
+                      hw.get("compute_capability") or "n/a",
+                      hw.get("nvcc_version") or "unknown",
+                      cmp.get("warmup", 0), cmp.get("iterations", 0),
+                      _fmt_cfg(cmp.get("baseline"))))
+        out.append("")
+        out.append("| matrix_class | tuned config | TileGen tuned ms | TileGen default ms | tuned/default | cuSPARSE ms | tuned/cuSPARSE | default/cuSPARSE |")
+        out.append("|---|---|---|---|---|---|---|---|")
+        losses = []
+        wins = []
+        loss_details = []
+        for row in rows:
+            t = row["tuned"]["ms_median"]
+            d = row["default"]["ms_median"]
+            c = row["cusparse"]["ms_median"]
+            if row["speedup_tuned_vs_cusparse"] < 1.0:
+                losses.append(row["matrix_class"])
+                imb = manifest.get(row["matrix_class"], {}).get("imbalance_ratio")
+                loss_details.append(
+                    "%s%s" % (row["matrix_class"],
+                              " (imbalance %.1fx)" % imb if imb else ""))
+            else:
+                wins.append(row["matrix_class"])
+            out.append("| %s | %s | %.6f | %.6f | %.2fx | %.6f | %.2fx | %.2fx |"
+                       % (row["matrix_class"], _fmt_cfg(row["tuned_config"]),
+                          t, d, d / t if t else 0.0, c,
+                          c / t if t else 0.0, c / d if d else 0.0))
+        out.append("")
+        if losses:
+            out.append("TileGen loses to cuSPARSE on **%s**. These are the "
+                       "high-variance, long-row classes: a row can contain "
+                       "roughly two thousand nonzeros, while TileGen's best "
+                       "schedule splits it across at most TPR=8 lanes and uses "
+                       "a fixed row tile per block. Each lane therefore still "
+                       "walks a long serial segment, and every row pays the "
+                       "segmented-shuffle reduction and per-block scheduling "
+                       "overhead. cuSPARSE's CSR SpMV instead uses its tuned "
+                       "merge/vectorized kernels to rebalance work across rows "
+                       "and issue wider memory accesses, which is exactly what "
+                       "these irregular rows need."
+                       % ", ".join(loss_details))
+        if wins:
+            out.append("TileGen wins on **%s**, which have shorter, more "
+                       "regular rows where a simple row-parallel kernel is "
+                       "competitive and cuSPARSE's more elaborate work "
+                       "distribution does not pay for itself."
+                       % ", ".join(wins))
+        out.append("")
+        out.append("The fixed default is the naive T32/TPR1/U1/V1/B128 "
+                   "schedule. Autotuning buys only ~1.01-1.07x on banded and "
+                   "diagonal_heavy, but 2.0-4.45x on uniform_random, blocked, "
+                   "power_law and dense_rows: on those classes the default's "
+                   "one-thread-per-row mapping serializes long or irregular "
+                   "rows. The cuSPARSE columns put both TileGen schedules in "
+                   "absolute context.")
+        out.append("")
 
     with open(os.path.join(RESULTS, "REPORT.md"), "w") as fh:
         fh.write("\n".join(out))

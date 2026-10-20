@@ -1,6 +1,8 @@
 # TileGen autotuning report
 
-Backend that produced these numbers: **cpu**. CPU: Apple M3 (8 cores). GPU: none detected. nvcc: not present.
+All-kernel table source: **cpu** backend. CPU: Apple M3 (8 cores). GPU: none detected. nvcc: not present.
+
+> The all-kernel table below is the earlier autotune run. The SpMV-on-CUDA autotune and cuSPARSE comparison were produced separately on a Tesla T4 (compute 7.5, nvcc 13.0.88) and are reported at the end of this file.
 
 Baseline (naive) config: T32/TPR1/U1/V1/B128. Search space: {'tile_size': [32, 64, 128, 256], 'threads_per_row': [1, 2, 4, 8, 32], 'unroll': [1, 2, 4, 8], 'vector_width': [1, 2, 4], 'block_size': [128, 256, 512]}.
 
@@ -59,3 +61,21 @@ Mean fusion speedup over the corpus: **1.11x** (fused_spmv_axpy vs separate spmv
 ## Pruning
 
 180 illegal configurations were pruned (e.g. threads_per_row > block_size, vector_width > unroll, block_size not divisible by threads_per_row). The full list is in build/autotune.json; results/autotune.json is the compact summary.
+
+## SpMV on CUDA vs cuSPARSE
+
+Autotuned on a **Tesla T4** (compute 7.5, nvcc 13.0.88). All timings use CUDA events: 10 warmup iterations and the median of 100 timed runs, with host/device transfers excluded. The fixed default is T32/TPR1/U1/V1/B128.
+
+| matrix_class | tuned config | TileGen tuned ms | TileGen default ms | tuned/default | cuSPARSE ms | tuned/cuSPARSE | default/cuSPARSE |
+|---|---|---|---|---|---|---|---|
+| banded | T128/TPR1/U4/V4/B512 | 0.148912 | 0.159792 | 1.07x | 0.186544 | 1.25x | 1.17x |
+| uniform_random | T64/TPR8/U2/V2/B128 | 0.200672 | 0.401376 | 2.00x | 0.217040 | 1.08x | 0.54x |
+| power_law | T64/TPR8/U2/V2/B128 | 0.217552 | 0.604144 | 2.78x | 0.134768 | 0.62x | 0.22x |
+| diagonal_heavy | T64/TPR1/U1/V1/B128 | 0.091872 | 0.092736 | 1.01x | 0.119088 | 1.30x | 1.28x |
+| dense_rows | T32/TPR8/U8/V1/B512 | 0.139600 | 0.621264 | 4.45x | 0.116384 | 0.83x | 0.19x |
+| blocked | T32/TPR4/U4/V4/B128 | 0.145760 | 0.327712 | 2.25x | 0.195136 | 1.34x | 0.60x |
+
+TileGen loses to cuSPARSE on **power_law (imbalance 247.4x), dense_rows (imbalance 83.6x)**. These are the high-variance, long-row classes: a row can contain roughly two thousand nonzeros, while TileGen's best schedule splits it across at most TPR=8 lanes and uses a fixed row tile per block. Each lane therefore still walks a long serial segment, and every row pays the segmented-shuffle reduction and per-block scheduling overhead. cuSPARSE's CSR SpMV instead uses its tuned merge/vectorized kernels to rebalance work across rows and issue wider memory accesses, which is exactly what these irregular rows need.
+TileGen wins on **banded, uniform_random, diagonal_heavy, blocked**, which have shorter, more regular rows where a simple row-parallel kernel is competitive and cuSPARSE's more elaborate work distribution does not pay for itself.
+
+The fixed default is the naive T32/TPR1/U1/V1/B128 schedule. Autotuning buys only ~1.01-1.07x on banded and diagonal_heavy, but 2.0-4.45x on uniform_random, blocked, power_law and dense_rows: on those classes the default's one-thread-per-row mapping serializes long or irregular rows. The cuSPARSE columns put both TileGen schedules in absolute context.

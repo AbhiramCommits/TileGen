@@ -110,42 +110,73 @@ def _flops_bytes(kernel: str, A: sp.csr_matrix, K: int) -> Tuple[float, float]:
     raise ValueError(kernel)
 
 
-def _make_caller(lib_path: str, kernel_name: str, A: sp.csr_matrix, data, K: int):
-    """Build a zero-argument closure that invokes the kernel with fixed buffers."""
+def _make_caller(lib_path: str, kernel_name: str, A: sp.csr_matrix, data,
+                 K: int, backend: str = "cpu"):
+    """Build a zero-argument closure that invokes the kernel with fixed buffers.
+
+    CUDA buffers are allocated and populated once; repeated calls therefore time
+    only the launch (and optional output copy), not host/device transfers.
+    """
     M, N = A.shape
     nnz = int(A.nnz)
     lib = ctypes.CDLL(lib_path)
     fn = getattr(lib, "launch_%s" % kernel_name)
-    from .verify import _SIGNATURES
+    from .verify import _SIGNATURES, _CudaBuffers
     fn.argtypes = _SIGNATURES[kernel_name]
 
     ip = A.indptr.astype(np.int64)
     ind = A.indices.astype(np.int64)
     dat = A.data.astype(np.float64)
     x, w, B, U, V, alpha, beta = data
-    p = lambda arr: arr.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-    pi = lambda arr: arr.ctypes.data_as(ctypes.POINTER(ctypes.c_longlong))
     keep = [ip, ind, dat, x, w, B, U, V]
 
     if kernel_name == "spmv":
         out = np.zeros(M, dtype=np.float64)
-        args = (pi(ip), pi(ind), p(dat), p(x), p(out), M, N, nnz)
+        arrays, out_index, scalars = [ip, ind, dat, x, out], 4, (M, N, nnz)
     elif kernel_name == "spmm":
         out = np.zeros((M, K), dtype=np.float64)
-        args = (pi(ip), pi(ind), p(dat), p(B), p(out), M, N, K, nnz)
+        arrays, out_index, scalars = [ip, ind, dat, B, out], 4, (M, N, K, nnz)
     elif kernel_name == "sddmm":
         out = np.zeros(nnz, dtype=np.float64)
-        args = (pi(ip), pi(ind), p(dat), p(U), p(V), p(out), M, N, K, nnz)
+        arrays, out_index, scalars = [ip, ind, dat, U, V, out], 5, (M, N, K, nnz)
     elif kernel_name == "fused_spmv_axpy":
         out = np.zeros(M, dtype=np.float64)
-        args = (pi(ip), pi(ind), p(dat), p(x), p(w), p(out), alpha, beta, M, N, nnz)
+        arrays, out_index, scalars = [ip, ind, dat, x, w, out], 5, (
+            alpha, beta, M, N, nnz)
     elif kernel_name == "axpy":
         out = np.zeros(M, dtype=np.float64)
-        args = (p(x), p(w), p(out), alpha, beta, M)
+        arrays, out_index, scalars = [x, w, out], 2, (alpha, beta, M)
     else:
         raise ValueError(kernel_name)
     keep.append(out)
-    return (lambda: fn(*args)), out, keep
+
+    if backend == "cuda":
+        buffers = _CudaBuffers(arrays)
+        args = [buffers.arg(i) for i in range(len(arrays))] + list(scalars)
+
+        def launch():
+            fn(*args)
+            buffers.synchronize()
+
+        def caller():
+            launch()
+            buffers.copy_back(out_index)
+
+        caller.launch = launch  # benchmark path: no device->host copy
+        keep.append(buffers)
+        return caller, out, keep
+
+    def host_arg(arr):
+        ctype = ctypes.c_longlong if arr.dtype == np.int64 else ctypes.c_double
+        return arr.ctypes.data_as(ctypes.POINTER(ctype))
+
+    args = [host_arg(arr) for arr in arrays] + list(scalars)
+
+    def caller():
+        fn(*args)
+
+    caller.launch = caller
+    return caller, out, keep
 
 
 def _time_caller(caller, warmup: int, iters: int) -> Tuple[float, float, float]:
@@ -235,7 +266,8 @@ def tune(
             records.append(rec)
             continue
 
-        caller, out, keep = _make_caller(lib_path, kernel_name, A, data, K)
+        caller, out, keep = _make_caller(lib_path, kernel_name, A, data, K,
+                                         backend=backend)
         caller()
         outv = np.asarray(out, dtype=np.float64).ravel()
         diff = np.abs(outv - ref)
@@ -245,7 +277,9 @@ def tune(
         row_nnz = int(np.diff(A.indptr).max()) if A.shape[0] else 1
         tol = float(8.0 * eps * max(1, row_nnz) * scale + 1e-12)
 
-        ms_mean, ms_min, ms_median = _time_caller(caller, warmup, iters)
+        # Transfer-free timing: caller.launch omits the device->host output copy.
+        ms_mean, ms_min, ms_median = _time_caller(
+            getattr(caller, "launch", caller), warmup, iters)
         rec.update({
             "ms_mean": ms_mean,
             "ms_min": ms_min,
